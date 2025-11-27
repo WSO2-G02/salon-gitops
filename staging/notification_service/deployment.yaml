@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification_service
+  namespace: staging
+spec:
+  replicas: 0   # <---- IMPORTANT FOR NOW
+  selector:
+    matchLabels:
+      app: notification_service
+  template:
+    metadata:
+      labels:
+        app: notification_service
+    spec:
+      containers:
+      - name: notification_service
+        image: <ECR_URL>/notification_service:latest
+        ports:
+        - containerPort: 8005

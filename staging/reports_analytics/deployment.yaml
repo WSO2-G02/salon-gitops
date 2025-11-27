@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reports_analytics
+  namespace: staging
+spec:
+  replicas: 0   # <---- IMPORTANT FOR NOW
+  selector:
+    matchLabels:
+      app: reports_analytics
+  template:
+    metadata:
+      labels:
+        app: reports_analytics
+    spec:
+      containers:
+      - name: reports_analytics
+        image: <ECR_URL>/reports_analytics:latest
+        ports:
+        - containerPort: 8006

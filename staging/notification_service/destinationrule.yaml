@@ -1,0 +1,10 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: notification_service
+  namespace: staging
+spec:
+  host: notification_service
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

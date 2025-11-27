@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: staff_management
+  namespace: staging
+spec:
+  hosts:
+  - "api.salon.example.com"
+  gateways:
+  - salon-gateway
+  http:
+  - route:
+    - destination:
+        host: staff_management
+        port:
+          number: 80

@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: reports_analytics
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/WSO2-G02/salon-gitops
+    path: staging/reports_analytics
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

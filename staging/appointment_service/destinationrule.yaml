@@ -1,0 +1,10 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: appointment_service
+  namespace: staging
+spec:
+  host: appointment_service
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

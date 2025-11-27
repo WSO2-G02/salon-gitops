@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staff_management
+  namespace: staging
+spec:
+  replicas: 0   # <---- IMPORTANT FOR NOW
+  selector:
+    matchLabels:
+      app: staff_management
+  template:
+    metadata:
+      labels:
+        app: staff_management
+    spec:
+      containers:
+      - name: staff_management
+        image: <ECR_URL>/staff_management:latest
+        ports:
+        - containerPort: 8003

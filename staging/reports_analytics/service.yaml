@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: reports_analytics
+  namespace: staging
+spec:
+  type: ClusterIP
+  selector:
+    app: reports_analytics
+  ports:
+  - port: 80
+    targetPort: 8006

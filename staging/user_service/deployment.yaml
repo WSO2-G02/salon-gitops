@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user_service
+  namespace: staging
+spec:
+  replicas: 0   # <---- IMPORTANT FOR NOW
+  selector:
+    matchLabels:
+      app: user_service
+  template:
+    metadata:
+      labels:
+        app: user_service
+    spec:
+      containers:
+      - name: user_service
+        image: <ECR_URL>/user_service:latest
+        ports:
+        - containerPort: 8001

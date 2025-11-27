@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service_management
+  namespace: staging
+spec:
+  replicas: 0   # <---- IMPORTANT FOR NOW
+  selector:
+    matchLabels:
+      app: service_management
+  template:
+    metadata:
+      labels:
+        app: service_management
+    spec:
+      containers:
+      - name: service_management
+        image: <ECR_URL>/service_management:latest
+        ports:
+        - containerPort: 8002
