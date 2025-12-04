@@ -4,7 +4,7 @@ metadata:
   name: reports_analytics
   namespace: staging
 spec:
-  replicas: 0   # <---- IMPORTANT FOR NOW
+  replicas: 1   
   selector:
     matchLabels:
       app: reports_analytics

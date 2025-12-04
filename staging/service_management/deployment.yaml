@@ -4,7 +4,7 @@ metadata:
   name: service_management
   namespace: staging
 spec:
-  replicas: 0   # <---- IMPORTANT FOR NOW
+  replicas: 1
   selector:
     matchLabels:
       app: service_management
