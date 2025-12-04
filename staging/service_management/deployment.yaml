@@ -1,20 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: service_management
+  name: service-management
   namespace: staging
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: service_management
+      app: service-management
   template:
     metadata:
       labels:
-        app: service_management
+        app: service-management
     spec:
       containers:
-      - name: service_management
+      - name: service-management
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/service_management:latest
         ports:
         - containerPort: 8002
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

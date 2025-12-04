@@ -1,10 +1,10 @@
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: reports_analytics
+  name: reports-analytics
   namespace: staging
 spec:
-  host: reports_analytics
+  host: reports-analytics
   trafficPolicy:
     tls:
       mode: ISTIO_MUTUAL

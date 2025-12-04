@@ -1,20 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: reports_analytics
+  name: reports-analytics
   namespace: staging
 spec:
   replicas: 1   
   selector:
     matchLabels:
-      app: reports_analytics
+      app: reports-analytics
   template:
     metadata:
       labels:
-        app: reports_analytics
+        app: reports-analytics
     spec:
       containers:
-      - name: reports_analytics
+      - name: reports-analytics
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:latest
         ports:
         - containerPort: 8006
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

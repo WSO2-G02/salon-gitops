@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: service_management
+  name: service-management
 spec:
   project: default
   source:

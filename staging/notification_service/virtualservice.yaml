@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: notification_service
+  name: notification-service
   namespace: staging
 spec:
   hosts:
@@ -9,8 +9,11 @@ spec:
   gateways:
   - salon-gateway
   http:
+  - match:
+    - uri:
+        prefix: /notification
   - route:
     - destination:
-        host: notification_service
+        host: notification-service
         port:
           number: 80

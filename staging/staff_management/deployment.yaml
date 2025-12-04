@@ -1,20 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: staff_management
+  name: staff-management
   namespace: staging
 spec:
   replicas: 1   
   selector:
     matchLabels:
-      app: staff_management
+      app: staff-management
   template:
     metadata:
       labels:
-        app: staff_management
+        app: staff-management
     spec:
       containers:
-      - name: staff_management
+      - name: staff-management
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/staff_management:latest
         ports:
         - containerPort: 8003
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: appointment_service
+  name: appointment-service
   namespace: staging
 spec:
   type: ClusterIP
   selector:
-    app: appointment_service
+    app: appointment-service
   ports:
   - port: 80
     targetPort: 8004

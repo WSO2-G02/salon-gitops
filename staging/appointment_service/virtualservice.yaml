@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: appointment_service
+  name: appointment-service
   namespace: staging
 spec:
   hosts:
@@ -9,9 +9,12 @@ spec:
   gateways:
   - salon-gateway
   http:
+  - match:
+    - uri:
+        prefix: /appointment
   - route:
     - destination:
-        host: appointment_service
+        host: appointment-service
         port:
           number: 80
           

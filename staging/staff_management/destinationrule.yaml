@@ -1,10 +1,10 @@
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: staff_management
+  name: staff-management
   namespace: staging
 spec:
-  host: staff_management
+  host: staff-management
   trafficPolicy:
     tls:
       mode: ISTIO_MUTUAL

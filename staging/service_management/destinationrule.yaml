@@ -1,10 +1,10 @@
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: service_management
+  name: service-management
   namespace: staging
 spec:
-  host: service_management
+  host: service-management
   trafficPolicy:
     tls:
       mode: ISTIO_MUTUAL

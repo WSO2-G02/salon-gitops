@@ -1,13 +1,13 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: service_management-hpa
+  name: service-management-hpa
   namespace: staging
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: service_management
+    name: service-management
   minReplicas: 1
   maxReplicas: 5
   metrics:

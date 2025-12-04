@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: staff_management
+  name: staff-management
   namespace: staging
 spec:
   type: ClusterIP
   selector:
-    app: staff_management
+    app: staff-management
   ports:
   - port: 80
     targetPort: 8003

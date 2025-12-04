@@ -1,20 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: appointment_service
+  name: appointment-service
   namespace: staging
 spec:
   replicas: 1  
   selector:
     matchLabels:
-      app: appointment_service
+      app: appointment-service
   template:
     metadata:
       labels:
-        app: appointment_service
+        app: appointment-service
     spec:
       containers:
-      - name: appointment_service
+      - name: appointment-service
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/appointment_service:latest
         ports:
         - containerPort: 8004
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

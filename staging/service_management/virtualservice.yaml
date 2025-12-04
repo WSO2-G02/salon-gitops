@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: service_management
+  name: service-management
   namespace: staging
 spec:
   hosts:
@@ -9,8 +9,11 @@ spec:
   gateways:
   - salon-gateway
   http:
+  - match:
+    - uri:
+        prefix: /service-management
   - route:
     - destination:
-        host: service_management
+        host: service-management
         port:
           number: 80

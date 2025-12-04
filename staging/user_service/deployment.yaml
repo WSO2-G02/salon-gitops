@@ -1,20 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: user_service
+  name: user-service
   namespace: staging
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: user_service
+      app: user-service
   template:
     metadata:
       labels:
-        app: user_service
+        app: user-service
     spec:
       containers:
-      - name: user_service
+      - name: user-service
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/user_service:latest
         ports:
         - containerPort: 8001
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

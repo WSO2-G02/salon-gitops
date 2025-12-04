@@ -1,13 +1,13 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: reports_analytics-hpa
+  name: reports-analytics-hpa
   namespace: staging
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: reports_analytics
+    name: reports-analytics
   minReplicas: 1
   maxReplicas: 5
   metrics:

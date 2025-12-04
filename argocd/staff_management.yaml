@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: staff_management
+  name: staff-management
 spec:
   project: default
   source:

@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: user_service
+  name: user-service
   namespace: staging
 spec:
   hosts:
@@ -9,8 +9,11 @@ spec:
   gateways:
   - salon-gateway
   http:
+  - match:
+    - uri:
+        prefix: /user-service
   - route:
     - destination:
-        host: user_service
+        host: user-service
         port:
           number: 80
