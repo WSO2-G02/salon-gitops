@@ -5,7 +5,7 @@ metadata:
   namespace: staging
 spec:
   hosts:
-  - "api.salon.example.com"
+  - "*"
   gateways:
   - salon-gateway
   http:
