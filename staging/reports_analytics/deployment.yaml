@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
       - name: reports_analytics
-        image: <ECR_URL>/reports_analytics:latest
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:latest
         ports:
         - containerPort: 8006

@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
       - name: notification_service
-        image: <ECR_URL>/notification_service:latest
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/notification_service:latest
         ports:
         - containerPort: 8005

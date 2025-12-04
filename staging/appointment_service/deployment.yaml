@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
       - name: appointment_service
-        image: <ECR_URL>/appointment_service:latest
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/appointment_service:latest
         ports:
         - containerPort: 8004
