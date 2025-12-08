@@ -12,7 +12,7 @@ spec:
   - match:
     - uri:
         prefix: /staff-management
-  - route:
+    route:
     - destination:
         host: staff-management
         port:

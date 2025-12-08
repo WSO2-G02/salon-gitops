@@ -12,7 +12,7 @@ spec:
   - match:
     - uri:
         prefix: /user-service
-  - route:
+    route:
     - destination:
         host: user-service
         port:
