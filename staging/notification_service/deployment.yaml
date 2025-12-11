@@ -4,7 +4,13 @@ metadata:
   name: notification-service
   namespace: staging
 spec:
-  replicas: 1   
+  replicas: 1
+  # Rolling Update: Zero-downtime deployment with automatic rollback protection
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: notification-service
@@ -18,6 +24,25 @@ spec:
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/notification_service:latest
         ports:
         - containerPort: 8005
+        # Readiness: Remove from service if unhealthy
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8005
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        # Liveness: Restart pod if unresponsive
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8005
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
         resources:
           requests:
             cpu: "100m"
