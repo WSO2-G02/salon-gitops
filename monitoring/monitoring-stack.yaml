@@ -1,0 +1,97 @@
+# OPENSEARCH 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opensearch
+  namespace: default 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opensearch
+  template:
+    metadata:
+      labels:
+        app: opensearch
+    spec:
+      containers:
+      - name: opensearch
+        image: opensearchproject/opensearch:2.11.0
+        env:
+        - name: discovery.type
+          value: "single-node"
+        - name: plugins.security.disabled
+          value: "true" # Disabled for easier demo
+        - name: OPENSEARCH_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+        ports:
+        - containerPort: 9200
+          protocol: TCP
+        volumeMounts:
+        - name: os-data
+          mountPath: /usr/share/opensearch/data
+      volumes:
+      - name: os-data
+        emptyDir: {}  # For demo, non-persistent storage
+
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-service
+  namespace: default
+spec:
+  selector:
+    app: opensearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+      protocol: TCP
+
+# GRAFANA
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - containerPort: 3000
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: default
+spec:
+  type: NodePort # Or LoadBalancer if on Cloud
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 32000 # Fixed port for easy access
+      protocol: TCP
