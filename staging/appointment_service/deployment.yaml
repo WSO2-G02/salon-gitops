@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: appointment-service
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/appointment_service:latest
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/appointment_service:8aba28a0-20251212053116
         ports:
         - containerPort: 8004
         # Readiness: Remove from service if unhealthy
@@ -72,8 +72,3 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: DB_PASSWORD
-              # OpenSearch connection details
-        - name: OPENSEARCH_HOST
-          value: "opensearch-service"
-        - name: OPENSEARCH_PORT
-          value: "9200"
