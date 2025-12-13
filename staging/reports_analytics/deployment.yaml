@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: reports-analytics
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:b8a46309-20251213104713
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:8b83280a-20251213105642
         ports:
         - containerPort: 8006
         # Readiness: Remove from service if unhealthy
