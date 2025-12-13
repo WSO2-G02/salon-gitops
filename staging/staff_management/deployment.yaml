@@ -23,7 +23,7 @@ spec:
       - name: ecr-registry-secret
       containers:
       - name: staff-management
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/staff_management:0ba079d6-20251213164613
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/staff_management:f0974a0c-20251213203338
         ports:
         - containerPort: 8003
         # Readiness: Remove from service if unhealthy
