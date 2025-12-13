@@ -59,7 +59,11 @@ echo ""
 echo "📂 Step 2: Applying GitOps Applications from 'argocd/'..."
 
 if [ -d "argocd" ]; then
-    kubectl apply -f argocd/
+    # Cleanup accidentally created apps in default namespace
+    kubectl delete application --all -n default --ignore-not-found &> /dev/null || true
+    
+    # Apply to argocd namespace
+    kubectl apply -n argocd -f argocd/
     echo "✅ Applied all manifests in 'argocd/'."
 else
     echo "❌ Error: 'argocd/' directory not found in current location."
