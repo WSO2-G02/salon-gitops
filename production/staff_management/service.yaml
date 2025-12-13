@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: staff-management
+  namespace: production
+spec:
+  type: ClusterIP
+  selector:
+    app: staff-management
+  ports:
+  - port: 80
+    targetPort: 8003

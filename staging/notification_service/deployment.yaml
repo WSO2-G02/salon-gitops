@@ -13,6 +13,8 @@ spec:
       labels:
         app: notification-service
     spec:
+      imagePullSecrets:
+      - name: ecr-registry-secret
       containers:
       - name: notification-service
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/notification_service:latest

@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: reports-analytics
-  namespace: staging
+  name: staff-management
+  namespace: production
 spec:
   replicas: 1   
   selector:
     matchLabels:
-      app: reports-analytics
+      app: staff-management
   template:
     metadata:
       labels:
-        app: reports-analytics
+        app: staff-management
     spec:
       imagePullSecrets:
       - name: ecr-registry-secret
       containers:
-      - name: reports-analytics
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:latest
+      - name: staff-management
+        image: 024955634588.dkr.ecr.ap-south-1.amazonaws.com/staff_management:latest
         ports:
-        - containerPort: 8006
+        - containerPort: 8003
         resources:
           requests:
             cpu: "100m"

@@ -13,6 +13,8 @@ spec:
       labels:
         app: user-service
     spec:
+      imagePullSecrets:
+      - name: ecr-registry-secret
       containers:
       - name: user-service
         image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/user_service:latest

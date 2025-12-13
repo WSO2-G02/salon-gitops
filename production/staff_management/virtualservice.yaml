@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: staff-management
+  namespace: production
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - salon-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /staff-management
+    route:
+    - destination:
+        host: staff-management
+        port:
+          number: 80
