@@ -2,15 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: reports-analytics
-  namespace: staging
+  namespace: production
 spec:
-  replicas: 1
-  # Rolling Update: Zero-downtime deployment with automatic rollback protection
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+  replicas: 1   
   selector:
     matchLabels:
       app: reports-analytics
@@ -23,28 +17,9 @@ spec:
       - name: ecr-registry-secret
       containers:
       - name: reports-analytics
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:1637c019-20251213160233
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:latest
         ports:
         - containerPort: 8006
-        # Readiness: Remove from service if unhealthy
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8006
-          initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-          successThreshold: 1
-        # Liveness: Restart pod if unresponsive
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8006
-          initialDelaySeconds: 15
-          periodSeconds: 20
-          timeoutSeconds: 5
-          failureThreshold: 3
         resources:
           requests:
             cpu: "100m"
@@ -73,5 +48,3 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: DB_PASSWORD
-      imagePullSecrets:
-        - name: aws-ecr-cred
