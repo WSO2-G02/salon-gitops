@@ -23,7 +23,7 @@ spec:
       - name: ecr-registry-secret
       containers:
       - name: reports-analytics
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:0ebfe38f-20251213161310
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/reports_analytics:0ba079d6-20251213164613
         ports:
         - containerPort: 8006
         # Readiness: Remove from service if unhealthy
