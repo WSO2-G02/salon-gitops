@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: user-service
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/user_service:8b83280a-20251213105642
+        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/user_service:1637c019-20251213160233
         ports:
         - containerPort: 8001
         # Readiness: Remove from service if unhealthy
