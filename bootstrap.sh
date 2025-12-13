@@ -71,6 +71,14 @@ else
     exit 1
 fi
 
+# Apply Istio Configurations
+echo ""
+echo "🕸️  Step 3: Applying Istio Configurations..."
+if [ -d "istio" ]; then
+    kubectl apply -f istio/
+    echo "✅ Applied Istio Gateway and VirtualServices."
+fi
+
 # 4. Get Info
 echo ""
 echo "🎉 GitOps Bootstrap Complete!"
