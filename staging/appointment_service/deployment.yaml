@@ -74,6 +74,6 @@ spec:
               key: DB_PASSWORD              
               # OpenSearch connection details
         - name: OPENSEARCH_HOST
-          value: "opensearch-service"
+          value: "opensearch-service.default.svc.cluster.local"
         - name: OPENSEARCH_PORT
           value: "9200"
