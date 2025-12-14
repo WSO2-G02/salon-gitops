@@ -14,7 +14,7 @@ spec:
         app: staff-management
     spec:
       imagePullSecrets:
-      - name: ecr-registry-secret
+      - name: aws-ecr-cred
       containers:
       - name: staff-management
         image: 024955634588.dkr.ecr.ap-south-1.amazonaws.com/staff_management:latest
