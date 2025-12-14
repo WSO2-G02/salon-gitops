@@ -429,12 +429,65 @@ kubectl logs deployment/user-service -n staging -c user-service
 
 ---
 
+## API Routing Configuration
+
+All API traffic is routed through Istio VirtualService via the `salon-gateway`.
+
+### Public URL Mapping
+
+| External Path | Backend Service | Internal Path |
+|---------------|-----------------|---------------|
+| `/api/users/*` | user-service | `/api/v1/*` |
+| `/api/appointments/*` | appointment-service | `/api/v1/*` |
+| `/api/services/*` | service-management | `/api/v1/*` |
+| `/api/staff/*` | staff-management | `/api/v1/*` |
+| `/api/notifications/*` | notification-service | `/api/v1/notifications/*` |
+| `/api/reports/*` | reports-analytics | `/api/v1/analytics/*` |
+| `/*` | frontend | `/*` (catch-all, must be last) |
+
+### Health Check Endpoints
+
+```bash
+# User Service
+curl https://aurora-glam.com/api/users/health
+
+# Appointment Service
+curl https://aurora-glam.com/api/appointments/health
+
+# Service Management
+curl https://aurora-glam.com/api/services/health
+
+# Staff Management
+curl https://aurora-glam.com/api/staff/health
+
+# Notification Service
+curl https://aurora-glam.com/api/notifications/health
+
+# Reports & Analytics
+curl https://aurora-glam.com/api/reports/health
+```
+
+### VirtualService Configuration
+
+The routing is consolidated in `salon-routes.yaml` files:
+- Staging: `staging/salon-routes.yaml`
+- Production: `production/salon-routes.yaml`
+
+**Important Notes:**
+- Route order matters - more specific routes must come before generic ones
+- The frontend catch-all (`/`) must be the LAST route
+- All services use the `istio-system/salon-gateway` gateway
+
+---
+
 ## Related Documentation
 
 - [ECR Credential Helper](../staging/ecr-credential-helper.yaml)
 - [Staging Secrets Template](../staging/secrets/app-secrets.example.yaml)
 - [Production Secrets Template](../production/secrets/app-secrets.example.yaml)
 - [Terraform RDS Reference](../../salon-k8s-infra/terraform/variables.tf)
+- [Staging VirtualService Routes](../staging/salon-routes.yaml)
+- [Production VirtualService Routes](../production/salon-routes.yaml)
 
 ---
 
@@ -446,3 +499,5 @@ kubectl logs deployment/user-service -n staging -c user-service
 | 2025-12-15 | Added app-secrets with RDS credentials | DevOps |
 | 2025-12-15 | Added DB_NAME override for user_service | DevOps |
 | 2025-12-15 | Created secrets template files | DevOps |
+| 2025-12-15 | Consolidated VirtualService routing | DevOps |
+| 2025-12-15 | Fixed API path rewrites for all services | DevOps |
