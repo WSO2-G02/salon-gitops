@@ -23,7 +23,7 @@ spec:
       - name: ecr-registry-secret
       containers:
       - name: service-management
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/service_management:f0974a0c-20251213203338
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/service_management:f0974a0c-20251213203338
         ports:
         - containerPort: 8002
         # Readiness: Remove from service if unhealthy

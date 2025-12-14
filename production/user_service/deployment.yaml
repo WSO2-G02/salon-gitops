@@ -17,7 +17,7 @@ spec:
       - name: ecr-registry-secret
       containers:
       - name: user-service
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/user_service:latest
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/user_service:latest
         ports:
         - containerPort: 8001
         resources:
