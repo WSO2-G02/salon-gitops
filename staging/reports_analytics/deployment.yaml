@@ -20,7 +20,7 @@ spec:
         app: reports-analytics
     spec:
       imagePullSecrets:
-      - name: ecr-registry-secret
+      - name: aws-ecr-cred
       containers:
       - name: reports-analytics
         image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/reports_analytics:f0974a0c-20251213203338
