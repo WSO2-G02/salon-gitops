@@ -1,118 +1,104 @@
 # Load Balancer & HTTPS Setup Guide
 
-This document describes the AWS Network Load Balancer (NLB) setup for the Salon application and how to configure HTTPS with Let's Encrypt.
+This document describes the AWS Application Load Balancer (ALB) setup for the Salon application with HTTPS using AWS Certificate Manager (ACM).
 
-## Current Infrastructure
+## Current Infrastructure (Production)
 
-### AWS Network Load Balancer (NLB)
+### AWS Application Load Balancer (ALB) - ACTIVE ✅
+
+**ALB Details:**
+- **Name:** salon-istio-alb
+- **DNS Name:** `salon-istio-alb-688560610.us-east-1.elb.amazonaws.com`
+- **Region:** us-east-1
+- **Type:** Application Load Balancer (Layer 7)
+
+**Listeners:**
+| Port | Protocol | Action |
+|------|----------|--------|
+| 80   | HTTP     | Redirect to HTTPS (301) |
+| 443  | HTTPS    | Forward to target group |
+
+**Target Group:**
+- `salon-istio-alb-tg`: Routes to Istio ingress gateway HTTP (NodePort 31252)
+- Health Check: `/healthz/ready` on port 31348
+
+**SSL/TLS:**
+- Certificate: AWS ACM managed (`arn:aws:acm:us-east-1:024955634588:certificate/0ea09438-151c-41df-87cb-d126b869b73c`)
+- Domains: `aurora-glam.com`, `*.aurora-glam.com`
+- SSL Policy: `ELBSecurityPolicy-TLS13-1-2-2021-06` (TLS 1.3)
+- Certificate expires: January 12, 2027 (auto-renewed by AWS)
+
+### Legacy NLB (Can be deleted)
 
 **NLB Details:**
 - **Name:** salon-istio-nlb
 - **DNS Name:** `salon-istio-nlb-5b4828878eedd9f2.elb.us-east-1.amazonaws.com`
-- **Region:** us-east-1
 - **Type:** Network Load Balancer (Layer 4)
-
-**Listeners:**
-| Port | Protocol | Target Group |
-|------|----------|--------------|
-| 80   | TCP      | salon-istio-http (NodePort 31252) |
-| 443  | TCP      | salon-istio-https (NodePort 32272) |
-
-**Target Groups:**
-- `salon-istio-http`: Routes to Istio ingress gateway HTTP (NodePort 31252)
-- `salon-istio-https`: Routes to Istio ingress gateway HTTPS (NodePort 32272)
+- **Status:** Replaced by ALB for HTTPS support
 
 ### Route53 DNS Configuration
 
 **Domain:** aurora-glam.com  
 **Hosted Zone ID:** Z09063931Q48E2MAYWPT1
 
-**DNS Records:**
+**DNS Records (Pointing to ALB):**
 | Record | Type | Target |
 |--------|------|--------|
-| aurora-glam.com | A (Alias) | salon-istio-nlb |
-| *.aurora-glam.com | A (Alias) | salon-istio-nlb |
-| argocd.aurora-glam.com | A (Alias) | salon-istio-nlb |
-| api.aurora-glam.com | A (Alias) | salon-istio-nlb |
-| grafana.aurora-glam.com | A (Alias) | salon-istio-nlb |
+| aurora-glam.com | A (Alias) | salon-istio-alb |
+| *.aurora-glam.com | A (Alias) | salon-istio-alb |
+| argocd.aurora-glam.com | A (Alias) | salon-istio-alb |
+| api.aurora-glam.com | A (Alias) | salon-istio-alb |
+| grafana.aurora-glam.com | A (Alias) | salon-istio-alb |
 
 ### Istio Ingress Gateway
 
 **Service:** istio-ingressgateway (istio-system namespace)
 - **External IP:** 212.104.231.155 (internal/MetalLB - not publicly routable)
 - **NodePorts:**
-  - HTTP: 31252
-  - HTTPS: 32272
-  - Status: 31348
+  - HTTP: 31252 (used by ALB)
+  - HTTPS: 32272 (not used - TLS terminates at ALB)
+  - Status: 31348 (health check)
 
-## HTTPS/TLS Setup
+## Architecture
 
-### Option 1: Manual Certificate (Current Approach)
+```
+Internet → ALB (HTTPS:443) → NodePort:31252 → Istio Gateway → VirtualServices → Services
+                ↓
+         TLS Termination
+         (AWS ACM Certificate)
+```
 
-For manual certificate management:
+**Key Points:**
+1. ALB handles TLS termination (HTTPS)
+2. Traffic inside cluster is HTTP (port 80)
+3. Istio Gateway only needs HTTP configuration
+4. No TLS certificates needed in Kubernetes
 
-1. **Obtain Certificate:**
-   - Get SSL certificate from a Certificate Authority (e.g., Let's Encrypt, DigiCert)
-   - You'll need: `cert.pem` (certificate), `key.pem` (private key), `chain.pem` (CA chain)
+## HTTPS Verification
 
-2. **Create Kubernetes Secret:**
-   ```bash
-   kubectl create secret tls aurora-glam-tls \
-     --cert=fullchain.pem \
-     --key=privkey.pem \
-     -n istio-system
-   ```
+Test HTTPS is working:
+```bash
+curl -sI https://argocd.aurora-glam.com | head -5
+```
 
-3. **Apply HTTPS Gateway:**
-   ```bash
-   kubectl apply -f istio/gateway-https.yaml
-   ```
+Expected output:
+```
+HTTP/2 200 
+date: ...
+content-type: text/html; charset=utf-8
+```
 
-### Option 2: Automated with cert-manager (Requires Additional Setup)
-
-cert-manager is installed but needs an ingress controller (nginx) for HTTP-01 challenges with Istio:
-
-1. **Install NGINX Ingress Controller:**
-   ```bash
-   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.5/deploy/static/provider/cloud/deploy.yaml
-   ```
-
-2. **Update ClusterIssuer:**
-   ```bash
-   kubectl apply -f cert-manager/cluster-issuers.yaml
-   ```
-
-3. **Request Certificate:**
-   ```bash
-   kubectl apply -f cert-manager/certificate.yaml
-   ```
-
-### Option 3: AWS Certificate Manager (ACM) with ALB
-
-For production with AWS-managed certificates:
-
-1. **Create ACM Certificate:**
-   ```bash
-   aws acm request-certificate \
-     --domain-name aurora-glam.com \
-     --subject-alternative-names "*.aurora-glam.com" \
-     --validation-method DNS \
-     --region us-east-1
-   ```
-
-2. **Validate Certificate:** Add DNS validation records to Route53
-
-3. **Replace NLB with ALB:** 
-   - Create Application Load Balancer
-   - Attach ACM certificate
-   - Configure HTTPS listeners with SSL termination
+Check SSL certificate:
+```bash
+curl -vI https://aurora-glam.com 2>&1 | grep -E "SSL|subject|issuer|expire"
+```
 
 ## Verification Commands
 
-### Check NLB Status
+### Check ALB Status
 ```bash
 aws elbv2 describe-load-balancers \
-  --load-balancer-arns arn:aws:elasticloadbalancing:us-east-1:024955634588:loadbalancer/net/salon-istio-nlb/5b4828878eedd9f2 \
+  --names salon-istio-alb \
   --region us-east-1 \
   --query 'LoadBalancers[0].{State:State.Code,DNSName:DNSName}'
 ```
@@ -120,20 +106,17 @@ aws elbv2 describe-load-balancers \
 ### Check Target Health
 ```bash
 aws elbv2 describe-target-health \
-  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:024955634588:targetgroup/salon-istio-http/62fcb842c8d123f1 \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:024955634588:targetgroup/salon-istio-alb-tg/e9721c80e97d7bdc \
   --region us-east-1 \
   --query 'TargetHealthDescriptions[*].{Id:Target.Id,State:TargetHealth.State}'
 ```
 
-### Test Domain Access
+### Check ACM Certificate
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" http://aurora-glam.com
-curl -s -o /dev/null -w "%{http_code}\n" http://argocd.aurora-glam.com
-```
-
-### Check Certificate (when HTTPS is configured)
-```bash
-curl -vI https://aurora-glam.com 2>&1 | grep -E "SSL|subject|expire"
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:024955634588:certificate/0ea09438-151c-41df-87cb-d126b869b73c \
+  --region us-east-1 \
+  --query 'Certificate.{Status:Status,DomainName:DomainName,NotAfter:NotAfter}'
 ```
 
 ## Troubleshooting
