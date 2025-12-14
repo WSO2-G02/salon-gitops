@@ -73,5 +73,4 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: DB_PASSWORD
-      imagePullSecrets:
-        - name: aws-ecr-cred
+

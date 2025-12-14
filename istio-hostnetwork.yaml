@@ -1,0 +1,21 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: demo
+  components:
+    ingressGateways:
+      - name: istio-ingressgateway
+        enabled: true
+        k8s:
+          overlays:
+          - apiVersion: apps/v1
+            kind: Deployment
+            name: istio-ingressgateway
+            patches:
+            - path: spec.template.spec.hostNetwork
+              value: true
+            - path: spec.template.spec.dnsPolicy
+              value: ClusterFirstWithHostNet
+            - path: spec.strategy
+              value:
+                type: Recreate

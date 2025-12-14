@@ -98,5 +98,4 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: FROM_EMAIL
-      imagePullSecrets:
-        - name: aws-ecr-cred
+
