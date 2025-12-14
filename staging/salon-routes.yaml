@@ -4,14 +4,19 @@
 # IMPORTANT: Route order matters! More specific routes MUST come before generic ones.
 # The frontend catch-all route ("/") must be LAST.
 #
-# Path Mapping:
-#   - /api/users/*        → user-service         /api/v1/*
-#   - /api/appointments/* → appointment-service  /api/v1/*
-#   - /api/services/*     → service-management   /api/v1/*
-#   - /api/staff/*        → staff-management     /api/v1/*
-#   - /api/notifications/*→ notification-service /api/v1/notifications/*
-#   - /api/reports/*      → reports-analytics    /api/v1/analytics/*
+# Path Mapping (frontend already includes /api/v1 in calls):
+#   - /api/users/*        → user-service         (strip /api/users prefix)
+#   - /api/appointments/* → appointment-service  (strip /api/appointments prefix)
+#   - /api/services/*     → service-management   (strip /api/services prefix)
+#   - /api/staff/*        → staff-management     (strip /api/staff prefix)
+#   - /api/notifications/*→ notification-service (strip /api/notifications prefix)
+#   - /api/reports/*      → reports-analytics    (strip /api/reports prefix)
 #   - /*                  → frontend (catch-all, must be last)
+#
+# Example flow:
+#   Frontend calls: https://aurora-glam.com/api/users/api/v1/login
+#   VirtualService strips /api/users → /api/v1/login
+#   Backend receives: /api/v1/login ✓
 # =============================================================================
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -28,72 +33,72 @@ spec:
   # API Routes (must be before frontend catch-all)
   # ============================================
   
-  # User Service API - /api/users/* → /api/v1/*
+  # User Service API - strip /api/users prefix, pass through to backend
   - match:
     - uri:
-        prefix: /api/users
+        prefix: /api/users/
     rewrite:
-      uri: /api/v1
+      uri: /
     route:
     - destination:
         host: user-service
         port:
           number: 80
   
-  # Appointment Service API - /api/appointments/* → /api/v1/*
+  # Appointment Service API - strip /api/appointments prefix
   - match:
     - uri:
-        prefix: /api/appointments
+        prefix: /api/appointments/
     rewrite:
-      uri: /api/v1
+      uri: /
     route:
     - destination:
         host: appointment-service
         port:
           number: 80
 
-  # Service Management API - /api/services/* → /api/v1/*
+  # Service Management API - strip /api/services prefix
   - match:
     - uri:
-        prefix: /api/services
+        prefix: /api/services/
     rewrite:
-      uri: /api/v1
+      uri: /
     route:
     - destination:
         host: service-management
         port:
           number: 80
 
-  # Staff Management API - /api/staff/* → /api/v1/*
+  # Staff Management API - strip /api/staff prefix
   - match:
     - uri:
-        prefix: /api/staff
+        prefix: /api/staff/
     rewrite:
-      uri: /api/v1
+      uri: /
     route:
     - destination:
         host: staff-management
         port:
           number: 80
 
-  # Notification Service API - /api/notifications/* → /api/v1/notifications/*
+  # Notification Service API - strip /api/notifications prefix
   - match:
     - uri:
-        prefix: /api/notifications
+        prefix: /api/notifications/
     rewrite:
-      uri: /api/v1/notifications
+      uri: /
     route:
     - destination:
         host: notification-service
         port:
           number: 80
 
-  # Reports & Analytics API - /api/reports/* → /api/v1/analytics/*
+  # Reports & Analytics API - strip /api/reports prefix
   - match:
     - uri:
-        prefix: /api/reports
+        prefix: /api/reports/
     rewrite:
-      uri: /api/v1/analytics
+      uri: /
     route:
     - destination:
         host: reports-analytics
