@@ -1,0 +1,170 @@
+# =============================================================================
+# Consolidated VirtualService for Staging Environment
+# =============================================================================
+# IMPORTANT: Route order matters! More specific routes MUST come before generic ones.
+# The frontend catch-all route ("/") must be LAST.
+#
+# API Routes:
+#   - /api/users/*        → user-service
+#   - /api/appointments/* → appointment-service
+#   - /api/services/*     → service-management
+#   - /api/staff/*        → staff-management
+#   - /api/notifications/*→ notification-service
+#   - /api/reports/*      → reports-analytics
+#   - /*                  → frontend (catch-all, must be last)
+# =============================================================================
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: salon-routes
+  namespace: production
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - istio-system/salon-gateway
+  http:
+  # ============================================
+  # API Routes (must be before frontend catch-all)
+  # ============================================
+  
+  # User Service API
+  - match:
+    - uri:
+        prefix: /api/users
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: user-service
+        port:
+          number: 80
+  
+  # Also support legacy /user-service path
+  - match:
+    - uri:
+        prefix: /user-service
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: user-service
+        port:
+          number: 80
+  
+  # Appointment Service API
+  - match:
+    - uri:
+        prefix: /api/appointments
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: appointment-service
+        port:
+          number: 80
+  
+  - match:
+    - uri:
+        prefix: /appointment
+    route:
+    - destination:
+        host: appointment-service
+        port:
+          number: 80
+
+  # Service Management API
+  - match:
+    - uri:
+        prefix: /api/services
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: service-management
+        port:
+          number: 80
+  
+  - match:
+    - uri:
+        prefix: /service-management
+    route:
+    - destination:
+        host: service-management
+        port:
+          number: 80
+
+  # Staff Management API
+  - match:
+    - uri:
+        prefix: /api/staff
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: staff-management
+        port:
+          number: 80
+  
+  - match:
+    - uri:
+        prefix: /staff-management
+    route:
+    - destination:
+        host: staff-management
+        port:
+          number: 80
+
+  # Notification Service API
+  - match:
+    - uri:
+        prefix: /api/notifications
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: notification-service
+        port:
+          number: 80
+  
+  - match:
+    - uri:
+        prefix: /notification
+    route:
+    - destination:
+        host: notification-service
+        port:
+          number: 80
+
+  # Reports & Analytics API
+  - match:
+    - uri:
+        prefix: /api/reports
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: reports-analytics
+        port:
+          number: 80
+  
+  - match:
+    - uri:
+        prefix: /reports-analytics
+    route:
+    - destination:
+        host: reports-analytics
+        port:
+          number: 80
+
+  # ============================================
+  # Frontend Catch-All (MUST BE LAST)
+  # ============================================
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: frontend
+        port:
+          number: 80
