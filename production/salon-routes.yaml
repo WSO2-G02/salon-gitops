@@ -9,8 +9,8 @@
 #   - /api/appointments/* → appointment-service  /api/v1/*
 #   - /api/services/*     → service-management   /api/v1/*
 #   - /api/staff/*        → staff-management     /api/v1/*
-#   - /api/notifications/*→ notification-service /api/v1/*
-#   - /api/reports/*      → reports-analytics    /api/v1/*
+#   - /api/notifications/*→ notification-service /api/v1/notifications/*
+#   - /api/reports/*      → reports-analytics    /api/v1/analytics/*
 #   - /*                  → frontend (catch-all, must be last)
 # =============================================================================
 apiVersion: networking.istio.io/v1beta1
@@ -76,24 +76,24 @@ spec:
         port:
           number: 80
 
-  # Notification Service API - /api/notifications/* → /api/v1/*
+  # Notification Service API - /api/notifications/* → /api/v1/notifications/*
   - match:
     - uri:
         prefix: /api/notifications
     rewrite:
-      uri: /api/v1
+      uri: /api/v1/notifications
     route:
     - destination:
         host: notification-service
         port:
           number: 80
 
-  # Reports & Analytics API - /api/reports/* → /api/v1/*
+  # Reports & Analytics API - /api/reports/* → /api/v1/analytics/*
   - match:
     - uri:
         prefix: /api/reports
     rewrite:
-      uri: /api/v1
+      uri: /api/v1/analytics
     route:
     - destination:
         host: reports-analytics
