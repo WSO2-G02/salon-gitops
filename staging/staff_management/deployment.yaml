@@ -23,7 +23,7 @@ spec:
       - name: aws-ecr-cred
       containers:
       - name: staff-management
-        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/staff_management:f0974a0c-20251213203338
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/staff_management:d77fdfa8-20251214185501
         ports:
         - containerPort: 8003
         # Readiness: Remove from service if unhealthy
