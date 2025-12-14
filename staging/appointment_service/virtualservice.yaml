@@ -7,7 +7,7 @@ spec:
   hosts:
   - "*"
   gateways:
-  - salon-gateway
+  - istio-system/salon-gateway
   http:
   - match:
     - uri:
