@@ -48,3 +48,5 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: DB_PASSWORD
+        - name: DB_NAME
+          value: "salon-db"  # Override default user_db to use shared database
