@@ -1,0 +1,29 @@
+# Updated Istio Gateway with HTTPS support
+# TLS certificates should be created as Kubernetes secrets
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: salon-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    # HTTP server - redirects to HTTPS when TLS is configured
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+    # HTTPS server for aurora-glam.com and subdomains
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "aurora-glam.com"
+        - "*.aurora-glam.com"
+      tls:
+        mode: SIMPLE
+        credentialName: aurora-glam-tls  # Secret containing TLS cert

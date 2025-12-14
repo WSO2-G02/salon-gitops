@@ -1,0 +1,18 @@
+# Certificate for aurora-glam.com domain
+# Note: Wildcard certificates require DNS-01 challenge, so we use individual subdomains
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: aurora-glam-tls
+  namespace: istio-system
+spec:
+  secretName: aurora-glam-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: aurora-glam.com
+  dnsNames:
+    - aurora-glam.com
+    - argocd.aurora-glam.com
+    - api.aurora-glam.com
+    - grafana.aurora-glam.com
