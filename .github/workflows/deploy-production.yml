@@ -108,13 +108,22 @@ jobs:
             if [ "$IMAGE_SOURCE" == "specific-tag" ] && [ -n "$SPECIFIC_TAG" ]; then
               NEW_TAG="$SPECIFIC_TAG"
             else
-              # Get tag from staging
+              # Get tag from staging deployment
               if [ ! -f "$STAGING_FILE" ]; then
                 echo "::warning::Staging file not found: $STAGING_FILE"
                 echo "| $SERVICE | - | - | SKIP (no staging) |" >> $GITHUB_STEP_SUMMARY
                 continue
               fi
-              NEW_TAG=$(grep "image:" "$STAGING_FILE" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
+              
+              STAGING_TAG=$(grep "image:" "$STAGING_FILE" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
+              
+              # For frontend: staging image has "staging-" prefix, production doesn't
+              # staging-abc12345-20251215 -> abc12345-20251215
+              if [ "$SERVICE" == "frontend" ]; then
+                NEW_TAG=$(echo "$STAGING_TAG" | sed 's/^staging-//')
+              else
+                NEW_TAG="$STAGING_TAG"
+              fi
             fi
             
             echo "Tag to deploy: $NEW_TAG"
