@@ -1,12 +1,14 @@
 # =============================================================================
 # Istio Gateway for Aurora Glam Salon
 # =============================================================================
-# This gateway accepts traffic for both staging and production domains.
+# This gateway accepts traffic for all salon domains.
 # VirtualServices in each namespace handle routing based on the Host header.
 #
 # Domains:
 #   - aurora-glam.com         → Production namespace
 #   - staging.aurora-glam.com → Staging namespace
+#   - argocd.aurora-glam.com  → ArgoCD namespace
+#   - grafana.aurora-glam.com → Monitoring (Grafana)
 #
 # TLS/HTTPS: Currently using HTTP. For HTTPS, add TLS configuration
 # with certificates from AWS Certificate Manager.
@@ -27,3 +29,5 @@ spec:
     hosts:
     - "aurora-glam.com"
     - "staging.aurora-glam.com"
+    - "argocd.aurora-glam.com"
+    - "grafana.aurora-glam.com"
