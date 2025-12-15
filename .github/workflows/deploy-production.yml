@@ -180,6 +180,8 @@ jobs:
             SERVICES="${{ needs.validate.outputs.services }}"
             git commit -m "[PRODUCTION] Deploy: $SERVICES - by ${{ github.actor }} - run ${{ github.run_id }}"
             
+            # Use PAT for authentication
+            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
             git push
             
             echo "" >> $GITHUB_STEP_SUMMARY
