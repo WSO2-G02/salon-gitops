@@ -4,10 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       services:
-        description: 'Services to deploy (comma-separated, or "all" for everything)'
+        description: 'Services to deploy'
         required: true
         default: 'all'
-        type: string
+        type: choice
+        options:
+          - all
+          - frontend
+          - user_service
+          - appointment_service
+          - service_management
+          - staff_management
+          - notification_service
+          - reports_analytics
       image_source:
         description: 'Image source'
         required: true
@@ -17,7 +26,7 @@ on:
           - promote-staging
           - specific-tag
       specific_tag:
-        description: 'Specific image tag (only if "specific-tag" selected above)'
+        description: 'Specific image tag (only if "specific-tag" selected)'
         required: false
         type: string
       confirm_deployment:
@@ -27,40 +36,28 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  AWS_ACCOUNT_ID: '024955634588'
-  GITOPS_REPO: 'WSO2-G02/salon-gitops'
-  
-  # All available services
-  ALL_SERVICES: >-
-    frontend,user_service,appointment_service,service_management,
-    staff_management,notification_service,reports_analytics
+  ECR_REGISTRY: '024955634588.dkr.ecr.us-east-1.amazonaws.com'
 
 jobs:
-  # ============================================================
-  # Validate Deployment Request
-  # ============================================================
   validate:
     name: Validate Request
     runs-on: ubuntu-latest
     outputs:
-      services_to_deploy: ${{ steps.parse.outputs.services }}
-      image_tags: ${{ steps.get_tags.outputs.tags }}
+      services: ${{ steps.parse.outputs.services }}
     steps:
       - name: Verify confirmation
         if: ${{ github.event.inputs.confirm_deployment != 'DEPLOY' }}
         run: |
-          echo "::error::Deployment not confirmed. Please type 'DEPLOY' to confirm."
+          echo "::error::Deployment not confirmed. Type 'DEPLOY' to confirm."
           exit 1
 
-      - name: Parse services to deploy
+      - name: Parse services
         id: parse
         run: |
           INPUT="${{ github.event.inputs.services }}"
-          ALL="${{ env.ALL_SERVICES }}"
           
           if [ "$INPUT" == "all" ]; then
-            # Remove whitespace and newlines from ALL_SERVICES
-            SERVICES=$(echo "$ALL" | tr -d ' \n')
+            SERVICES="frontend user_service appointment_service service_management staff_management notification_service reports_analytics"
           else
             SERVICES="$INPUT"
           fi
@@ -68,74 +65,8 @@ jobs:
           echo "Services to deploy: $SERVICES"
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
 
-      - name: Checkout GitOps repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.GITOPS_REPO }}
-          token: ${{ secrets.GITOPS_TOKEN }}
-          path: gitops
-
-      - name: Get image tags for each service
-        id: get_tags
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          SERVICES: ${{ steps.parse.outputs.services }}
-          IMAGE_SOURCE: ${{ github.event.inputs.image_source }}
-          SPECIFIC_TAG: ${{ github.event.inputs.specific_tag }}
-        run: |
-          pip install awscli --quiet
-          
-          declare -A TAGS
-          ECR_REGISTRY="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-          
-          echo "## Image Tags to Deploy" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Image Tag | Source |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          
-          for service in $(echo "$SERVICES" | tr ',' ' '); do
-            if [ "$IMAGE_SOURCE" == "specific-tag" ] && [ -n "$SPECIFIC_TAG" ]; then
-              TAG="$SPECIFIC_TAG"
-              SOURCE="Specific tag"
-            else
-              # Get tag from staging deployment
-              STAGING_FILE="gitops/staging/${service}/deployment.yaml"
-              if [ -f "$STAGING_FILE" ]; then
-                TAG=$(grep -oP "image:.*${service}:\K[^\s\"']+" "$STAGING_FILE" | head -1)
-                SOURCE="Promoted from staging"
-              else
-                echo "::warning::Staging deployment not found for $service"
-                continue
-              fi
-            fi
-            
-            # Verify image exists in ECR
-            if aws ecr describe-images \
-              --repository-name "$service" \
-              --image-ids imageTag="$TAG" \
-              --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-              echo "| $service | \`$TAG\` | $SOURCE |" >> $GITHUB_STEP_SUMMARY
-              TAGS[$service]="$TAG"
-            else
-              echo "::error::Image $service:$TAG not found in ECR!"
-              exit 1
-            fi
-          done
-          
-          # Output as JSON
-          JSON="{"
-          for service in "${!TAGS[@]}"; do
-            JSON="$JSON\"$service\":\"${TAGS[$service]}\","
-          done
-          JSON="${JSON%,}}"
-          
-          echo "tags=$JSON" >> $GITHUB_OUTPUT
-
-  # ============================================================
-  # Deploy to Production
-  # ============================================================
   deploy:
-    name: Deploy to Production
+    name: Deploy Services
     runs-on: ubuntu-latest
     needs: [validate]
     environment: production
@@ -143,47 +74,86 @@ jobs:
       - name: Checkout GitOps repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ env.GITOPS_REPO }}
           token: ${{ secrets.GITOPS_TOKEN }}
-          path: gitops
 
-      - name: Update production deployments
-        env:
-          ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-          SERVICES: ${{ needs.validate.outputs.services_to_deploy }}
-          IMAGE_TAGS: ${{ needs.validate.outputs.image_tags }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy all services
         run: |
-          cd gitops
+          SERVICES="${{ needs.validate.outputs.services }}"
+          IMAGE_SOURCE="${{ github.event.inputs.image_source }}"
+          SPECIFIC_TAG="${{ github.event.inputs.specific_tag }}"
           
-          echo "## Deployment Updates" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Previous Tag | New Tag |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "## Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Previous Tag | New Tag | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------------|---------|--------|" >> $GITHUB_STEP_SUMMARY
           
-          for service in $(echo "$SERVICES" | tr ',' ' '); do
-            PROD_FILE="production/${service}/deployment.yaml"
+          FAILED=0
+          
+          for SERVICE in $SERVICES; do
+            echo "=========================================="
+            echo "Processing: $SERVICE"
+            echo "=========================================="
             
-            if [ -f "$PROD_FILE" ]; then
-              # Get current tag
-              CURRENT_TAG=$(grep -oP "image:.*${service}:\K[^\s\"']+" "$PROD_FILE" | head -1)
-              
-              # Get new tag from JSON (simplified parsing)
-              NEW_TAG=$(echo '${{ needs.validate.outputs.image_tags }}' | jq -r ".${service} // empty")
-              
-              if [ -n "$NEW_TAG" ]; then
-                # Update the deployment file
-                sed -i "s|image: .*${service}:.*|image: ${ECR_REGISTRY}/${service}:${NEW_TAG}|g" "$PROD_FILE"
-                echo "| $service | \`$CURRENT_TAG\` | \`$NEW_TAG\` |" >> $GITHUB_STEP_SUMMARY
-                echo "[OK] Updated $service: $CURRENT_TAG -> $NEW_TAG"
-              fi
+            STAGING_FILE="staging/${SERVICE}/deployment.yaml"
+            PROD_FILE="production/${SERVICE}/deployment.yaml"
+            
+            # Get the tag to deploy
+            if [ "$IMAGE_SOURCE" == "specific-tag" ] && [ -n "$SPECIFIC_TAG" ]; then
+              NEW_TAG="$SPECIFIC_TAG"
             else
-              echo "[SKIP] Production deployment not found: $PROD_FILE"
+              # Get tag from staging
+              if [ ! -f "$STAGING_FILE" ]; then
+                echo "::warning::Staging file not found: $STAGING_FILE"
+                echo "| $SERVICE | - | - | SKIP (no staging) |" >> $GITHUB_STEP_SUMMARY
+                continue
+              fi
+              NEW_TAG=$(grep "image:" "$STAGING_FILE" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
             fi
+            
+            echo "Tag to deploy: $NEW_TAG"
+            
+            # Verify image exists in ECR
+            if ! aws ecr describe-images \
+              --repository-name "$SERVICE" \
+              --image-ids imageTag="$NEW_TAG" \
+              --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+              echo "::error::Image not found in ECR: $SERVICE:$NEW_TAG"
+              echo "| $SERVICE | - | $NEW_TAG | FAILED (not in ECR) |" >> $GITHUB_STEP_SUMMARY
+              FAILED=1
+              continue
+            fi
+            
+            # Check production file exists
+            if [ ! -f "$PROD_FILE" ]; then
+              echo "::warning::Production file not found: $PROD_FILE"
+              echo "| $SERVICE | - | - | SKIP (no prod file) |" >> $GITHUB_STEP_SUMMARY
+              continue
+            fi
+            
+            # Get current production tag
+            CURRENT_TAG=$(grep "image:" "$PROD_FILE" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
+            
+            # Update production deployment
+            sed -i "s|image: ${{ env.ECR_REGISTRY }}/${SERVICE}:.*|image: ${{ env.ECR_REGISTRY }}/${SERVICE}:${NEW_TAG}|g" "$PROD_FILE"
+            
+            echo "Updated: $CURRENT_TAG -> $NEW_TAG"
+            echo "| $SERVICE | \`$CURRENT_TAG\` | \`$NEW_TAG\` | OK |" >> $GITHUB_STEP_SUMMARY
           done
+          
+          if [ $FAILED -eq 1 ]; then
+            echo "::error::Some services failed validation"
+            exit 1
+          fi
 
       - name: Commit and push changes
         run: |
-          cd gitops
-          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
@@ -191,46 +161,30 @@ jobs:
           
           if git diff --staged --quiet; then
             echo "No changes to commit"
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Result:** No changes needed" >> $GITHUB_STEP_SUMMARY
           else
-            git commit -m "[PRODUCTION] Deploy services - ${{ github.event.inputs.services }}
+            SERVICES="${{ needs.validate.outputs.services }}"
+            git commit -m "[PRODUCTION] Deploy: $SERVICES
 
 Deployed by: ${{ github.actor }}
 Source: ${{ github.event.inputs.image_source }}
-Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+Workflow run: ${{ github.run_id }}"
             
             git push
-            echo "[OK] Production manifests updated and pushed!"
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Result:** Successfully pushed to GitOps repo" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Create deployment summary
+      - name: Deployment complete
         run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Services:** ${{ github.event.inputs.services }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. ArgoCD will auto-sync within 3 minutes" >> $GITHUB_STEP_SUMMARY
           echo "2. Monitor: https://argocd.aurora-glam.com" >> $GITHUB_STEP_SUMMARY
           echo "3. Verify: https://aurora-glam.com" >> $GITHUB_STEP_SUMMARY
-
-  # ============================================================
-  # Notify
-  # ============================================================
-  notify:
-    name: Notify
-    runs-on: ubuntu-latest
-    needs: [validate, deploy]
-    if: always()
-    steps:
-      - name: Report status
-        run: |
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "[SUCCESS] Production deployment completed!"
-            echo "Services: ${{ github.event.inputs.services }}"
-          else
-            echo "[FAILED] Production deployment failed!"
-            echo "Check workflow logs for details."
-          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
