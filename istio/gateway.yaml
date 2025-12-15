@@ -1,3 +1,16 @@
+# =============================================================================
+# Istio Gateway for Aurora Glam Salon
+# =============================================================================
+# This gateway accepts traffic for both staging and production domains.
+# VirtualServices in each namespace handle routing based on the Host header.
+#
+# Domains:
+#   - aurora-glam.com         → Production namespace
+#   - staging.aurora-glam.com → Staging namespace
+#
+# TLS/HTTPS: Currently using HTTP. For HTTPS, add TLS configuration
+# with certificates from AWS Certificate Manager.
+# =============================================================================
 apiVersion: networking.istio.io/v1beta1
 kind: Gateway
 metadata:
@@ -12,4 +25,5 @@ spec:
       name: http
       protocol: HTTP
     hosts:
-    - "*"
+    - "aurora-glam.com"
+    - "staging.aurora-glam.com"

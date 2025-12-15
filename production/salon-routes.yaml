@@ -1,6 +1,9 @@
 # =============================================================================
-# Consolidated VirtualService for Production Environment
+# Consolidated VirtualService for PRODUCTION Environment
 # =============================================================================
+# Domain: aurora-glam.com
+# Purpose: Live production traffic for real users
+#
 # IMPORTANT: Route order matters! More specific routes MUST come before generic ones.
 # The frontend catch-all route ("/") must be LAST.
 #
@@ -25,8 +28,7 @@ metadata:
   namespace: production
 spec:
   hosts:
-  - "aurora-glam.com"      # Main production domain
-  - "www.aurora-glam.com"  # www subdomain
+  - "aurora-glam.com"
   gateways:
   - istio-system/salon-gateway
   http:

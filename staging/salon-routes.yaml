@@ -1,6 +1,9 @@
 # =============================================================================
-# Consolidated VirtualService for Staging Environment
+# Consolidated VirtualService for STAGING Environment
 # =============================================================================
+# Domain: staging.aurora-glam.com
+# Purpose: QA and testing before production deployment
+#
 # IMPORTANT: Route order matters! More specific routes MUST come before generic ones.
 # The frontend catch-all route ("/") must be LAST.
 #
@@ -14,7 +17,7 @@
 #   - /*                  → frontend (catch-all, must be last)
 #
 # Example flow:
-#   Frontend calls: https://aurora-glam.com/api/users/api/v1/login
+#   Frontend calls: https://staging.aurora-glam.com/api/users/api/v1/login
 #   VirtualService strips /api/users → /api/v1/login
 #   Backend receives: /api/v1/login ✓
 # =============================================================================
@@ -25,7 +28,7 @@ metadata:
   namespace: staging
 spec:
   hosts:
-  - "staging.aurora-glam.com"  # Only handle staging subdomain
+  - "staging.aurora-glam.com"
   gateways:
   - istio-system/salon-gateway
   http:
