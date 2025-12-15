@@ -1,5 +1,5 @@
 # =============================================================================
-# Consolidated VirtualService for Staging Environment
+# Consolidated VirtualService for Production Environment
 # =============================================================================
 # IMPORTANT: Route order matters! More specific routes MUST come before generic ones.
 # The frontend catch-all route ("/") must be LAST.
@@ -25,7 +25,8 @@ metadata:
   namespace: production
 spec:
   hosts:
-  - "*"
+  - "aurora-glam.com"      # Main production domain
+  - "www.aurora-glam.com"  # www subdomain
   gateways:
   - istio-system/salon-gateway
   http:

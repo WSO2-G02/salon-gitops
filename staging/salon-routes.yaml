@@ -25,7 +25,7 @@ metadata:
   namespace: staging
 spec:
   hosts:
-  - "*"
+  - "staging.aurora-glam.com"  # Only handle staging subdomain
   gateways:
   - istio-system/salon-gateway
   http:
