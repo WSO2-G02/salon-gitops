@@ -1,7 +1,5 @@
 # Aurora Glam Infrastructure & Domain Setup Guide
 
-> Complete guide for team members on how the infrastructure works and how to add new services/domains.
-
 ---
 
 ## Table of Contents
@@ -27,7 +25,7 @@
 
 ### DNS Configuration
 
-Your DNS (likely Route53 or external provider) should have:
+Your DNS (Route53) should have:
 ```
 *.aurora-glam.com  →  A record  →  [Load Balancer IP / Istio Ingress IP]
 ```
@@ -522,12 +520,3 @@ https://github.com/WSO2-G02/salon-gitops/actions/workflows/deploy-production.yml
 | `salon-k8s-infra/terraform/variables.tf` | Infrastructure settings |
 | `salon-k8s-infra/terraform/ecr.tf` | Container registries |
 
-### AWS Resources Created by Terraform
-- 1 VPC (10.0.0.0/16)
-- 2 Public subnets + 2 Private subnets
-- 1 Internet Gateway
-- 4 Security Groups
-- 3-6 EC2 instances (Auto Scaling)
-- 7 ECR repositories (one per service)
-- 1 GitHub Actions runner instance
-- IAM roles for ECR access and cluster autoscaling
