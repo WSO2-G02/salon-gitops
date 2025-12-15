@@ -1,0 +1,21 @@
+# VirtualService to route ACME HTTP-01 challenges to cert-manager solver
+# This allows cert-manager to work with Istio Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: acme-challenge
+  namespace: istio-system
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - salon-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /.well-known/acme-challenge/
+      route:
+        - destination:
+            host: cm-acme-http-solver-pod-service
+            port:
+              number: 8089

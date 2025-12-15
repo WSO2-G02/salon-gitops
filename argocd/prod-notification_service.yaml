@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-notification-service
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/WSO2-G02/salon-gitops
+    path: production/notification_service
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

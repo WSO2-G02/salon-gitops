@@ -19,9 +19,11 @@ spec:
       labels:
         app: user-service
     spec:
+      imagePullSecrets:
+      - name: aws-ecr-cred
       containers:
       - name: user-service
-        image: 024955634588.dkr.ecr.eu-north-1.amazonaws.com/user_service:8aba28a0-20251212053116
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/user_service:d77fdfa8-20251214185501
         ports:
         - containerPort: 8001
         # Readiness: Remove from service if unhealthy
@@ -71,5 +73,7 @@ spec:
             secretKeyRef:
               name: app-secrets
               key: DB_PASSWORD
+        - name: DB_NAME
+          value: "salon-db"  # Override default user_db to use shared database
       imagePullSecrets:
         - name: aws-ecr-cred

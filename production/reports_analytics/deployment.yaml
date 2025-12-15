@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reports-analytics
+  namespace: production
+spec:
+  replicas: 1   
+  selector:
+    matchLabels:
+      app: reports-analytics
+  template:
+    metadata:
+      labels:
+        app: reports-analytics
+    spec:
+      imagePullSecrets:
+      - name: aws-ecr-cred
+      containers:
+      - name: reports-analytics
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/reports_analytics:latest
+        ports:
+        - containerPort: 8006
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        env:
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: JWT_SECRET_KEY
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_HOST
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_PASSWORD
