@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: monitoring
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush 1
+        Log_Level info
+    [INPUT]
+        Name tail
+        Path /var/log/containers/*.log
+        Parser json
+        Tag kube.*
+
+    [OUTPUT]
+        Name  opensearch
+        Host  172.31.72.137
+        Port  9200
+        Index salon-logs
+        Logstash_Format On
