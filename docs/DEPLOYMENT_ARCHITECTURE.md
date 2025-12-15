@@ -8,120 +8,247 @@
 1. [Architecture Overview](#architecture-overview)
 2. [Repository Structure](#repository-structure)
 3. [How Deployment Works](#how-deployment-works)
-4. [ArgoCD Configuration](#argocd-configuration)
-5. [Staging vs Production](#staging-vs-production)
-6. [Step-by-Step: Code to Production](#step-by-step-code-to-production)
-7. [How to Deploy to Production](#how-to-deploy-to-production)
-8. [Security: Restricting Staging Access](#security-restricting-staging-access)
-9. [Infrastructure Components](#infrastructure-components)
-10. [Troubleshooting](#troubleshooting)
+4. [Deploying to Production](#deploying-to-production)
+5. [ArgoCD Configuration](#argocd-configuration)
+6. [Staging vs Production](#staging-vs-production)
+7. [Security: Restricting Staging Access](#security-restricting-staging-access)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Architecture Overview
 
+### The Big Picture
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              DEVELOPER WORKFLOW                                  │
+│                         DEPLOYMENT FLOW OVERVIEW                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  GitHub Repository (salon-booking-frontend-dev / salon-booking-backend-dev)     │
-│                                                                                  │
-│   Push to main branch ─────────────────────────────────────────────────────────►│
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                          GitHub Actions CI/CD Pipeline                           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────────┐   │
-│  │  Build   │─►│   Test   │─►│  Scan    │─►│Push to   │─►│ Update GitOps   │   │
-│  │  Image   │  │  (Jest)  │  │ (Trivy)  │  │   ECR    │  │ (STAGING ONLY)  │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └─────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         GitOps Repository (salon-gitops)                         │
-│                                                                                  │
-│   ┌─────────────────────────────┐    ┌─────────────────────────────┐           │
-│   │   staging/                  │    │   production/               │           │
-│   │   ├── frontend/             │    │   ├── frontend/             │           │
-│   │   │   └── deployment.yaml   │◄───│   │   └── deployment.yaml   │           │
-│   │   ├── user_service/         │    │   ├── user_service/         │           │
-│   │   └── ...                   │    │   └── ...                   │           │
-│   │                             │    │                             │           │
-│   │   CI/CD auto-updates here   │    │   Manual promotion only     │           │
-│   └─────────────────────────────┘    └─────────────────────────────┘           │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                            ArgoCD watches this repo
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                                ArgoCD                                            │
-│  ┌───────────────────────────────────┐ ┌───────────────────────────────────┐   │
-│  │  Staging Applications             │ │  Production Applications          │   │
-│  │  ─────────────────────────────    │ │  ─────────────────────────────    │   │
-│  │  • frontend        → staging ns   │ │  • prod-frontend    → production │   │
-│  │  • user-service    → staging ns   │ │  • prod-user-service→ production │   │
-│  │  • appointment-svc → staging ns   │ │  • prod-appointment → production │   │
-│  │  • ...                            │ │  • ...                            │   │
-│  │                                   │ │                                   │   │
-│  │  Auto-sync: YES                   │ │  Auto-sync: YES                   │   │
-│  └───────────────────────────────────┘ └───────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           Kubernetes Cluster                                     │
-│  ┌───────────────────────────────────┐ ┌───────────────────────────────────┐   │
-│  │  Namespace: staging               │ │  Namespace: production            │   │
-│  │  ─────────────────────────────    │ │  ─────────────────────────────    │   │
-│  │  • frontend pod                   │ │  • frontend pod                   │   │
-│  │  • user-service pod               │ │  • user-service pod               │   │
-│  │  • appointment-service pod        │ │  • appointment-service pod        │   │
-│  │  • service-management pod         │ │  • service-management pod         │   │
-│  │  • staff-management pod           │ │  • staff-management pod           │   │
-│  │  • notification-service pod       │ │  • notification-service pod       │   │
-│  │  • reports-analytics pod          │ │  • reports-analytics pod          │   │
-│  └───────────────────────────────────┘ └───────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Istio Service Mesh                                    │
-│  ┌───────────────────────────────────────────────────────────────────────────┐ │
-│  │  Gateway (istio-system/salon-gateway)                                     │ │
-│  │  Accepts traffic for:                                                     │ │
-│  │  • aurora-glam.com                                                        │ │
-│  │  • staging.aurora-glam.com                                                │ │
-│  │  • argocd.aurora-glam.com                                                 │ │
-│  └───────────────────────────────────────────────────────────────────────────┘ │
-│                                      │                                          │
-│      ┌───────────────────────────────┴───────────────────────────────┐         │
-│      ▼                                                               ▼         │
-│  ┌─────────────────────────────┐    ┌─────────────────────────────┐           │
-│  │  VirtualService (staging)   │    │  VirtualService (production)│           │
-│  │  Host: staging.aurora-glam  │    │  Host: aurora-glam.com      │           │
-│  │  Routes to: staging ns      │    │  Routes to: production ns   │           │
-│  └─────────────────────────────┘    └─────────────────────────────┘           │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              AWS Infrastructure                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
-│  │    Route53   │  │     ALB      │  │     ECR      │  │  EC2 Nodes   │        │
-│  │  DNS Records │  │Load Balancer │  │Docker Images │  │  K8s Workers │        │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘        │
-└─────────────────────────────────────────────────────────────────────────────────┘
+
+  FRONTEND REPO                              BACKEND REPO
+  (salon-booking-frontend-dev)               (salon-booking-backend-dev)
+           │                                          │
+           │ push to main                             │ push to main
+           ▼                                          ▼
+  ┌─────────────────┐                       ┌─────────────────┐
+  │  CI/CD Pipeline │                       │  CI/CD Pipeline │
+  │  (ci-cd.yml)    │                       │(ci-cd-pipeline) │
+  └────────┬────────┘                       └────────┬────────┘
+           │                                          │
+           │ Updates staging/frontend/               │ Updates staging/{service}/
+           ▼                                          ▼
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                     GITOPS REPO (salon-gitops)                       │
+  │  ┌─────────────────────────┐    ┌─────────────────────────┐         │
+  │  │   staging/              │    │   production/           │         │
+  │  │   ├── frontend/         │    │   ├── frontend/         │         │
+  │  │   ├── user_service/     │    │   ├── user_service/     │         │
+  │  │   ├── appointment_svc/  │    │   ├── appointment_svc/  │         │
+  │  │   └── ...               │    │   └── ...               │         │
+  │  │                         │    │                         │         │
+  │  │  ◄── CI/CD AUTO-UPDATES │    │  ◄── MANUAL PROMOTION   │         │
+  │  └─────────────────────────┘    └─────────────────────────┘         │
+  │                                                                      │
+  │  .github/workflows/deploy-production.yml  ← UNIFIED DEPLOY WORKFLOW │
+  └─────────────────────────────────────────────────────────────────────┘
+                              │
+                    ArgoCD watches both folders
+                              │
+           ┌──────────────────┴──────────────────┐
+           ▼                                      ▼
+  ┌─────────────────┐                    ┌─────────────────┐
+  │  STAGING        │                    │  PRODUCTION     │
+  │  Namespace      │                    │  Namespace      │
+  │                 │                    │                 │
+  │  staging.       │                    │  aurora-glam.   │
+  │  aurora-glam.com│                    │  com            │
+  └─────────────────┘                    └─────────────────┘
 ```
 
 ---
 
-## Repository Structure
+## How Deployment Works
+
+### Automatic Flow (Push to Staging)
+
+```
+Developer pushes code to main branch
+              │
+              ▼
+┌─────────────────────────────────────────┐
+│         GitHub Actions CI/CD            │
+│  ┌─────┐  ┌─────┐  ┌─────┐  ┌───────┐  │
+│  │Build│─►│Test │─►│Scan │─►│Push to│  │
+│  │     │  │     │  │     │  │  ECR  │  │
+│  └─────┘  └─────┘  └─────┘  └───────┘  │
+│                                  │      │
+│                                  ▼      │
+│           ┌─────────────────────────┐   │
+│           │ Update GitOps Repo      │   │
+│           │ staging/{service}/      │   │
+│           │ deployment.yaml         │   │
+│           └─────────────────────────┘   │
+└─────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────┐
+│           ArgoCD Auto-Sync              │
+│                                         │
+│  Detects change in staging/ folder      │
+│  Deploys to staging namespace           │
+└─────────────────────────────────────────┘
+              │
+              ▼
+        staging.aurora-glam.com
+        (Ready for testing!)
+```
+
+### Manual Flow (Deploy to Production)
+
+```
+Team member triggers "Deploy to Production" workflow
+              │
+              ▼
+┌─────────────────────────────────────────┐
+│     Deploy to Production Workflow       │
+│     (salon-gitops/.github/workflows/)   │
+│                                         │
+│  1. Select services: "all" or specific  │
+│  2. Choose: promote staging OR tag      │
+│  3. Type "DEPLOY" to confirm            │
+└─────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────┐
+│           Workflow Actions              │
+│                                         │
+│  1. Validates image exists in ECR       │
+│  2. Gets tag from staging (or input)    │
+│  3. Updates production/{service}/       │
+│     deployment.yaml                     │
+│  4. Commits to salon-gitops             │
+└─────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────┐
+│           ArgoCD Auto-Sync              │
+│                                         │
+│  Detects change in production/ folder   │
+│  Deploys to production namespace        │
+└─────────────────────────────────────────┘
+              │
+              ▼
+          aurora-glam.com
+          (Live for users!)
+```
+
+---
+
+## Deploying to Production
+
+### Step-by-Step Guide
+
+#### 1. Go to the Deploy Workflow
+
+Navigate to: **https://github.com/WSO2-G02/salon-gitops/actions/workflows/deploy-production.yml**
+
+Or: GitHub → salon-gitops repo → Actions → "Deploy to Production"
+
+#### 2. Click "Run workflow"
+
+#### 3. Fill in the Options
+
+| Field | Options | Description |
+|-------|---------|-------------|
+| **Services** | `all` | Deploy ALL services (frontend + 6 backend) |
+| | `frontend` | Deploy only frontend |
+| | `user_service,frontend` | Deploy specific services (comma-separated) |
+| **Image source** | `promote-staging` | Use the same image currently in staging |
+| | `specific-tag` | Use a specific image tag |
+| **Specific tag** | (optional) | Only if you chose "specific-tag" above |
+| **Confirm** | `DEPLOY` | Type exactly "DEPLOY" to confirm |
+
+#### 4. Click "Run workflow" (green button)
+
+#### 5. Monitor the Deployment
+
+- Watch the workflow progress
+- Check ArgoCD: https://argocd.aurora-glam.com
+- Verify site: https://aurora-glam.com
+
+### Example Scenarios
+
+**Deploy everything that's in staging to production:**
+```
+Services: all
+Image source: promote-staging
+Confirm: DEPLOY
+```
+
+**Deploy only the frontend:**
+```
+Services: frontend
+Image source: promote-staging
+Confirm: DEPLOY
+```
+
+**Deploy frontend and user_service:**
+```
+Services: frontend,user_service
+Image source: promote-staging
+Confirm: DEPLOY
+```
+
+**Deploy a specific version:**
+```
+Services: frontend
+Image source: specific-tag
+Specific tag: abc12345-20251215120000
+Confirm: DEPLOY
+```
+
+---
+
+## Why This Architecture?
+
+### Industry Best Practice: GitOps with Staged Promotion
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    WHY STAGING → PRODUCTION?                     │
+└─────────────────────────────────────────────────────────────────┘
+
+                    TRADITIONAL (Risky)
+                    ─────────────────────
+                    Code → Build → Deploy directly to production
+                    
+                    Problem: Bugs go straight to users!
+
+                    
+                    OUR APPROACH (Safe)
+                    ─────────────────────
+                    Code → Build → Staging → Test → Production
+                    
+                    Benefits:
+                    ✓ Catch bugs before users see them
+                    ✓ QA team can test new features
+                    ✓ Rollback is easy (deploy previous tag)
+                    ✓ Production is always stable
+```
+
+### Why One Unified Deploy Workflow?
+
+| Approach | Workflows | Pros | Cons |
+|----------|-----------|------|------|
+| Per-service workflows | 7 workflows | Fine control | Hard to manage, must deploy each separately |
+| **Unified workflow** ⭐ | 1 workflow | Easy to use, deploy all or specific | Slightly less flexible |
+| Git branch promotion | 0 workflows | Pure GitOps | Requires git knowledge |
+
+**We chose unified** because:
+- ✅ One place to deploy everything
+- ✅ Can still deploy individual services
+- ✅ Easy for any team member to use
+- ✅ Clear audit trail in GitHub Actions
 
 We have **4 main repositories**:
 
