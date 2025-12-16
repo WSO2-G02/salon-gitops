@@ -1,0 +1,28 @@
+# =============================================================================
+# VirtualService for Grafana Dashboard
+# =============================================================================
+# Routes traffic from grafana.aurora-glam.com to the Grafana service
+# in the monitoring namespace.
+#
+# Grafana is deployed as part of the kube-prometheus-stack Helm chart.
+# Service: prometheus-grafana (port 80)
+# =============================================================================
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: grafana-vs
+  namespace: monitoring
+spec:
+  hosts:
+  - "grafana.aurora-glam.com"
+  gateways:
+  - istio-system/salon-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: prometheus-grafana.monitoring.svc.cluster.local
+        port:
+          number: 80
