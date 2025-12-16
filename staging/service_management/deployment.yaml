@@ -23,7 +23,7 @@ spec:
       - name: aws-ecr-cred
       containers:
       - name: service-management
-        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/service_management:d77fdfa8-20251214185501
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/service_management:d77fdfa8-20251216160536
         ports:
         - containerPort: 8002
         # Readiness: Remove from service if unhealthy
