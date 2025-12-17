@@ -23,7 +23,7 @@ spec:
       - name: aws-ecr-cred
       containers:
       - name: appointment-service
-        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/appointment_service:d77fdfa8-20251216160536
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/appointment_service:bc77eea3-20251217030943
         ports:
         - containerPort: 8004
         # Readiness: Remove from service if unhealthy
