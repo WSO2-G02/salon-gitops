@@ -23,7 +23,7 @@ spec:
       - name: aws-ecr-cred
       containers:
       - name: notification-service
-        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/notification_service:a50d4a05-20251217160614
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/notification_service:8f8d60df-20251217183005
         ports:
         - containerPort: 8005
         # Readiness: Remove from service if unhealthy

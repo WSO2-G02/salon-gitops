@@ -23,7 +23,7 @@ spec:
       - name: aws-ecr-cred
       containers:
       - name: reports-analytics
-        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/reports_analytics:a50d4a05-20251217160614
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/reports_analytics:8f8d60df-20251217183005
         ports:
         - containerPort: 8006
         # Readiness: Remove from service if unhealthy
