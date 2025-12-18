@@ -23,7 +23,7 @@ spec:
       - name: aws-ecr-cred
       containers:
       - name: user-service
-        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/user_service:8f8d60df-20251217183005
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/user_service:6b87943b-20251218043659
         ports:
         - containerPort: 8001
         # Readiness: Remove from service if unhealthy
