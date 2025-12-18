@@ -85,7 +85,7 @@ jobs:
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
           
           # Create JSON array for matrix (if needed later)
-          JSON=$(echo "$SERVICES" | tr ' ' '\n' | jq -R . | jq -s .)
+          JSON=$(echo "$SERVICES" | tr ' ' '\n' | jq -R . | jq -s -c .)
           echo "services_json=$JSON" >> $GITHUB_OUTPUT
 
       - name: Summary
