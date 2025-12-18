@@ -183,7 +183,7 @@ jobs:
           done
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # STEP 4: Determine rollback target (with smart fallback)
+  # STEP 4: Determine rollback target 
   # ═══════════════════════════════════════════════════════════════════════════
   step4-determine-target:
     name: Determine Rollback Target
@@ -204,7 +204,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Determine rollback targets with smart fallback
+      - name: Determine rollback targets with fallback
         id: plan
         run: |
           SERVICES="${{ needs.step1-validate.outputs.services }}"
@@ -241,7 +241,7 @@ jobs:
               
             else
               # ════════════════════════════════════════════════════════════
-              # SMART FALLBACK LOGIC
+              # FALLBACK LOGIC
               # ════════════════════════════════════════════════════════════
               
               # Method 1: Try git history first
@@ -261,7 +261,7 @@ jobs:
               
               # Method 2: Get available tags from ECR (sorted by push date, newest first)
               if [ -z "$ROLLBACK_TAG" ]; then
-                echo "  → Trying ECR image list (smart fallback)..."
+                echo "  → Trying ECR image list (fallback)..."
                 
                 # Get all production tags sorted by date (newest first)
                 # Exclude: 'latest', 'staging-*' prefixed tags
