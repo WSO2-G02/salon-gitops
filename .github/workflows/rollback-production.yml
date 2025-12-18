@@ -7,7 +7,6 @@
 #   2. Select service(s) to rollback
 #   3. Choose rollback type (previous version or specific tag)
 #   4. Type "ROLLBACK" to confirm
-#   5. Wait for approval (if environment protection enabled)
 # =============================================================================
 
 name: Rollback Production
@@ -318,29 +317,12 @@ jobs:
           echo "- **Filtered** - Ignores \`staging-*\` and \`latest\` tags" >> $GITHUB_STEP_SUMMARY
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # STEP 5: Wait for manual approval (if configured)
+  # STEP 5: Execute the rollback
   # ═══════════════════════════════════════════════════════════════════════════
-  step5-approval:
-    name: Approval Gate
-    runs-on: ubuntu-latest
-    needs: [step1-validate, step4-determine-target]
-    environment: production  # Requires approval if protection rules set
-    steps:
-      - name: Approval received
-        run: |
-          echo "## Approval Gate" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Approved by:** Environment protection rules passed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_If no approval was required, environment protection is not configured._" >> $GITHUB_STEP_SUMMARY
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # STEP 6: Execute the rollback
-  # ═══════════════════════════════════════════════════════════════════════════
-  step6-execute:
+  step5-execute:
     name: Execute Rollback
     runs-on: ubuntu-latest
-    needs: [step1-validate, step4-determine-target, step5-approval]
+    needs: [step1-validate, step4-determine-target]
     outputs:
       rollback_executed: ${{ steps.execute.outputs.rollback_executed }}
     steps:
@@ -413,16 +395,16 @@ jobs:
           fi
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # STEP 7: Post-rollback actions (notify, create issue)
+  # STEP 6: Post-rollback actions (notify, create issue)
   # ═══════════════════════════════════════════════════════════════════════════
-  step7-post-rollback:
+  step6-post-rollback:
     name: Post-Rollback
     runs-on: ubuntu-latest
-    needs: [step1-validate, step4-determine-target, step6-execute]
+    needs: [step1-validate, step4-determine-target, step5-execute]
     if: always()
     steps:
       - name: Create tracking issue
-        if: needs.step6-execute.outputs.rollback_executed == 'true'
+        if: needs.step5-execute.outputs.rollback_executed == 'true'
         uses: actions/github-script@v7
         with:
           script: |
