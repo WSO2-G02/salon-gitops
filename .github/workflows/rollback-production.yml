@@ -194,8 +194,6 @@ jobs:
     steps:
       - name: Checkout GitOps repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -241,62 +239,51 @@ jobs:
               
             else
               # ════════════════════════════════════════════════════════════
-              # FALLBACK LOGIC
+              # ECR-BASED ROLLBACK TARGET DETECTION
               # ════════════════════════════════════════════════════════════
+              # Get the previous image from ECR 
+              # - Queries actual images in ECR
+              # - Sorted by push date (newest first)
+              # - Filters out 'latest' and 'staging-*' tags
+              # - Selects first tag that is different from current tag
               
-              # Method 1: Try git history first
-              echo "  → Trying git history..."
-              GIT_TAG=$(git log --oneline -n 2 --follow -- "$PROD_FILE" 2>/dev/null | tail -1 | awk '{print $1}' | xargs -I {} git show {}:"$PROD_FILE" 2>/dev/null | grep "image:" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
+              echo "  → Querying ECR for available images..."
               
-              if [ -n "$GIT_TAG" ] && [ "$GIT_TAG" != "$CURRENT_TAG" ]; then
-                # Verify it exists in ECR
-                if aws ecr describe-images --repository-name "$SERVICE" --image-ids imageTag="$GIT_TAG" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-                  ROLLBACK_TAG="$GIT_TAG"
-                  SOURCE="Git history"
-                  echo "  ✅ Found in git history: $ROLLBACK_TAG"
-                else
-                  echo "  ⚠️ Git tag $GIT_TAG not in ECR, trying fallback..."
+              # Get all production tags sorted by date (newest first)
+              ECR_TAGS=$(aws ecr describe-images \
+                --repository-name "$SERVICE" \
+                --query 'sort_by(imageDetails,&imagePushedAt)[*].imageTags[0]' \
+                --output text 2>/dev/null | tr '\t' '\n' | grep -v "^None$" | grep -v "^latest$" | grep -v "^staging-" | tac)
+              
+              # Find the FIRST tag that is different from current
+              FOUND_CURRENT=false
+              for TAG in $ECR_TAGS; do
+                if [ -z "$TAG" ]; then continue; fi
+                
+                # Skip if this IS the current tag (we want the one BEFORE it)
+                if [ "$TAG" == "$CURRENT_TAG" ]; then
+                  FOUND_CURRENT=true
+                  echo "  Skipping current: $TAG"
+                  continue
                 fi
-              fi
+                
+                # After finding current, the next tag is our rollback target
+                if [ "$FOUND_CURRENT" = true ]; then
+                  ROLLBACK_TAG="$TAG"
+                  SOURCE="ECR (previous)"
+                  echo "  ✅ Found previous image: $ROLLBACK_TAG"
+                  break
+                fi
+              done
               
-              # Method 2: Get available tags from ECR (sorted by push date, newest first)
-              if [ -z "$ROLLBACK_TAG" ]; then
-                echo "  → Trying ECR image list (fallback)..."
-                
-                # Get all production tags sorted by date (newest first)
-                # Exclude: 'latest', 'staging-*' prefixed tags
-                ECR_TAGS=$(aws ecr describe-images \
-                  --repository-name "$SERVICE" \
-                  --query 'sort_by(imageDetails,&imagePushedAt)[*].imageTags[0]' \
-                  --output text 2>/dev/null | tr '\t' '\n' | grep -v "^None$" | grep -v "^latest$" | grep -v "^staging-" | tac)
-                
-                # Find the FIRST tag that:
-                # 1. Is different from current
-                # 2. Actually exists in ECR
-                FOUND_CURRENT=false
-                for TAG in $ECR_TAGS; do
-                  if [ -z "$TAG" ]; then continue; fi
-                  
-                  # Skip if this IS the current tag (we want the one BEFORE it)
-                  if [ "$TAG" == "$CURRENT_TAG" ]; then
-                    FOUND_CURRENT=true
-                    echo "  Skipping current: $TAG"
-                    continue
-                  fi
-                  
-                  # If we found current and this is different, this is our target
-                  if [ "$FOUND_CURRENT" = true ] || [ "$TAG" != "$CURRENT_TAG" ]; then
-                    # Double-verify it exists in ECR
-                    if aws ecr describe-images --repository-name "$SERVICE" --image-ids imageTag="$TAG" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-                      ROLLBACK_TAG="$TAG"
-                      SOURCE="ECR auto-detect"
-                      echo "  ✅ Found in ECR: $ROLLBACK_TAG"
-                      break
-                    else
-                      echo "  Tag $TAG not in ECR, trying next..."
-                    fi
-                  fi
-                done
+              # If we didn't find current in ECR, just use the second newest
+              if [ -z "$ROLLBACK_TAG" ] && [ "$FOUND_CURRENT" = false ]; then
+                echo "  ⚠️ Current tag not found in ECR, using second newest..."
+                ROLLBACK_TAG=$(echo "$ECR_TAGS" | sed -n '2p')
+                if [ -n "$ROLLBACK_TAG" ]; then
+                  SOURCE="ECR (2nd newest)"
+                  echo "  ✅ Using second newest: $ROLLBACK_TAG"
+                fi
               fi
             fi
             
@@ -325,10 +312,10 @@ jobs:
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "### Fallback Logic" >> $GITHUB_STEP_SUMMARY
-          echo "1. **Git history** - Find previous tag from commit history" >> $GITHUB_STEP_SUMMARY
-          echo "2. **ECR auto-detect** - Find next available image before current" >> $GITHUB_STEP_SUMMARY
-          echo "3. **Skip staging** - Ignores \`staging-*\` and \`latest\` tags" >> $GITHUB_STEP_SUMMARY
+          echo "### Detection Method" >> $GITHUB_STEP_SUMMARY
+          echo "- **ECR-based** - Queries actual images from AWS ECR" >> $GITHUB_STEP_SUMMARY
+          echo "- **Sorted by push date** - Newest first, selects previous" >> $GITHUB_STEP_SUMMARY
+          echo "- **Filtered** - Ignores \`staging-*\` and \`latest\` tags" >> $GITHUB_STEP_SUMMARY
 
   # ═══════════════════════════════════════════════════════════════════════════
   # STEP 5: Wait for manual approval (if configured)
