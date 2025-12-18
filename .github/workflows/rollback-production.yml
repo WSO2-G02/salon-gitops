@@ -1,5 +1,5 @@
 # =============================================================================
-# Production Rollback Workflow
+# Production Rollback Workflow (Enhanced)
 # =============================================================================
 #
 # Usage:
@@ -33,7 +33,7 @@ on:
         required: true
         type: choice
         options:
-          - previous    # Go back to previous tag
+          - previous    # Go back to previous available tag
           - specific    # Use specific tag from input
         default: 'previous'
       specific_tag:
@@ -54,19 +54,23 @@ permissions:
   issues: write
 
 jobs:
-  validate:
-    name: Validate Rollback Request
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 1: Validate the rollback request
+  # ═══════════════════════════════════════════════════════════════════════════
+  step1-validate:
+    name: Validate Request
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.parse.outputs.services }}
+      services_json: ${{ steps.parse.outputs.services_json }}
     steps:
-      - name: Verify confirmation
+      - name: Verify ROLLBACK confirmation
         if: ${{ github.event.inputs.confirm_rollback != 'ROLLBACK' }}
         run: |
-          echo "::error::Rollback not confirmed. Type 'ROLLBACK' to confirm."
+          echo "::error::❌ Rollback not confirmed. You must type 'ROLLBACK' exactly."
           exit 1
 
-      - name: Parse services
+      - name: Parse services to rollback
         id: parse
         run: |
           INPUT="${{ github.event.inputs.service }}"
@@ -77,67 +81,121 @@ jobs:
             SERVICES="$INPUT"
           fi
           
-          echo "Services to rollback: $SERVICES"
+          echo "✅ Services to rollback: $SERVICES"
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          
+          # Create JSON array for matrix (if needed later)
+          JSON=$(echo "$SERVICES" | tr ' ' '\n' | jq -R . | jq -s .)
+          echo "services_json=$JSON" >> $GITHUB_OUTPUT
 
-  show-versions:
-    name: Show Current & Available Versions
+      - name: Summary
+        run: |
+          echo "##  Validation Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ROLLBACK confirmation | ✅ Confirmed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Services | \`${{ github.event.inputs.service }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rollback Type | \`${{ github.event.inputs.rollback_type }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Initiated By | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 2: Show current production versions
+  # ═══════════════════════════════════════════════════════════════════════════
+  step2-current-versions:
+    name: Check Current Versions
     runs-on: ubuntu-latest
-    needs: validate
+    needs: step1-validate
+    outputs:
+      current_tags: ${{ steps.check.outputs.current_tags }}
     steps:
       - name: Checkout GitOps repo
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Show current and available versions
+      - name: Get current production tags
+        id: check
         run: |
-          SERVICES="${{ needs.validate.outputs.services }}"
+          SERVICES="${{ needs.step1-validate.outputs.services }}"
           
           echo "## Current Production Versions" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Current Tag |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Current Tag | Deployed Since |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------------|----------------|" >> $GITHUB_STEP_SUMMARY
           
+          CURRENT_TAGS=""
           for SERVICE in $SERVICES; do
             PROD_FILE="production/${SERVICE}/deployment.yaml"
             if [ -f "$PROD_FILE" ]; then
               CURRENT_TAG=$(grep "image:" "$PROD_FILE" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
-              echo "| $SERVICE | \`$CURRENT_TAG\` |" >> $GITHUB_STEP_SUMMARY
+              # Extract date from tag (format: abc12345-20251214185501)
+              TAG_DATE=$(echo "$CURRENT_TAG" | grep -oE '[0-9]{14}' | head -1)
+              if [ -n "$TAG_DATE" ]; then
+                FORMATTED_DATE="${TAG_DATE:0:4}-${TAG_DATE:4:2}-${TAG_DATE:6:2} ${TAG_DATE:8:2}:${TAG_DATE:10:2}"
+              else
+                FORMATTED_DATE="Unknown"
+              fi
+              echo "| $SERVICE | \`$CURRENT_TAG\` | $FORMATTED_DATE |" >> $GITHUB_STEP_SUMMARY
+              CURRENT_TAGS="$CURRENT_TAGS$SERVICE:$CURRENT_TAG,"
+            else
+              echo "| $SERVICE | ⚠️ No deployment file | - |" >> $GITHUB_STEP_SUMMARY
             fi
           done
           
+          echo "current_tags=$CURRENT_TAGS" >> $GITHUB_OUTPUT
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 3: List available images in ECR
+  # ═══════════════════════════════════════════════════════════════════════════
+  step3-available-images:
+    name: List ECR Images
+    runs-on: ubuntu-latest
+    needs: [step1-validate, step2-current-versions]
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: List available images in ECR
+        run: |
+          SERVICES="${{ needs.step1-validate.outputs.services }}"
+          
+          echo "## Available Images in ECR" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Available Tags in ECR (Last 10)" >> $GITHUB_STEP_SUMMARY
+          echo "_These are the images you can rollback to:_" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           for SERVICE in $SERVICES; do
             echo "### $SERVICE" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| # | Tag | Pushed Date |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|-----|-------------|" >> $GITHUB_STEP_SUMMARY
+            
+            # Get last 5 images with dates
             aws ecr describe-images \
               --repository-name "$SERVICE" \
-              --query 'sort_by(imageDetails,&imagePushedAt)[-10:].imageTags[0]' \
-              --output text 2>/dev/null | tr '\t' '\n' | grep -v "^None$" | tail -10 >> $GITHUB_STEP_SUMMARY || echo "No tags found" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              --query 'sort_by(imageDetails,&imagePushedAt)[-5:].{Tag:imageTags[0],Pushed:imagePushedAt}' \
+              --output json 2>/dev/null | jq -r 'reverse | to_entries[] | "| \(.key + 1) | `\(.value.Tag // "untagged")` | \(.value.Pushed[:19]) |"' >> $GITHUB_STEP_SUMMARY || echo "| - | No images found | - |" >> $GITHUB_STEP_SUMMARY
+            
             echo "" >> $GITHUB_STEP_SUMMARY
           done
 
-  rollback:
-    name: Execute Rollback
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 4: Determine rollback target (with smart fallback)
+  # ═══════════════════════════════════════════════════════════════════════════
+  step4-determine-target:
+    name: Determine Rollback Target
     runs-on: ubuntu-latest
-    needs: [validate, show-versions]
-    environment: production  # Requires approval if protection rules set
+    needs: [step1-validate, step2-current-versions, step3-available-images]
+    outputs:
+      rollback_plan: ${{ steps.plan.outputs.rollback_plan }}
     steps:
       - name: Checkout GitOps repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT_TOKEN }}
-          fetch-depth: 0  # Need full history to find previous versions
+          fetch-depth: 0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -146,77 +204,204 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Execute rollback
+      - name: Determine rollback targets with smart fallback
+        id: plan
         run: |
-          SERVICES="${{ needs.validate.outputs.services }}"
+          SERVICES="${{ needs.step1-validate.outputs.services }}"
           ROLLBACK_TYPE="${{ github.event.inputs.rollback_type }}"
           SPECIFIC_TAG="${{ github.event.inputs.specific_tag }}"
           
-          echo "## Rollback Execution" >> $GITHUB_STEP_SUMMARY
+          echo "## Rollback Target Selection" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Previous Tag | Rollback Tag | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------------|--------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Current | Target | Source | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|---------|--------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          ROLLBACK_PLAN=""
           
           for SERVICE in $SERVICES; do
-            echo "=========================================="
-            echo "Rolling back: $SERVICE"
-            echo "=========================================="
+            echo " Analyzing: $SERVICE"
             
             PROD_FILE="production/${SERVICE}/deployment.yaml"
             
             if [ ! -f "$PROD_FILE" ]; then
-              echo "::warning::Production file not found: $PROD_FILE"
-              echo "| $SERVICE | - | - | ⚠️ SKIP (no file) |" >> $GITHUB_STEP_SUMMARY
+              echo "| $SERVICE | - | - | - | ⚠️ No file |" >> $GITHUB_STEP_SUMMARY
               continue
             fi
             
             # Get current tag
             CURRENT_TAG=$(grep "image:" "$PROD_FILE" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
             
+            ROLLBACK_TAG=""
+            SOURCE=""
+            
             if [ "$ROLLBACK_TYPE" == "specific" ] && [ -n "$SPECIFIC_TAG" ]; then
-              # Use specific tag
+              # User specified exact tag
               ROLLBACK_TAG="$SPECIFIC_TAG"
-            else
-              # Find previous tag from git history
-              # Look for the previous commit that changed this file
-              PREVIOUS_TAG=$(git log --oneline -n 2 --follow -- "$PROD_FILE" | tail -1 | awk '{print $1}' | xargs -I {} git show {}:"$PROD_FILE" 2>/dev/null | grep "image:" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
+              SOURCE="User specified"
               
-              if [ -z "$PREVIOUS_TAG" ] || [ "$PREVIOUS_TAG" == "$CURRENT_TAG" ]; then
-                # If can't find from git, get second-latest from ECR
-                ROLLBACK_TAG=$(aws ecr describe-images \
+            else
+              # ════════════════════════════════════════════════════════════
+              # SMART FALLBACK LOGIC
+              # ════════════════════════════════════════════════════════════
+              
+              # Method 1: Try git history first
+              echo "  → Trying git history..."
+              GIT_TAG=$(git log --oneline -n 2 --follow -- "$PROD_FILE" 2>/dev/null | tail -1 | awk '{print $1}' | xargs -I {} git show {}:"$PROD_FILE" 2>/dev/null | grep "image:" | head -1 | awk -F: '{print $NF}' | tr -d ' ')
+              
+              if [ -n "$GIT_TAG" ] && [ "$GIT_TAG" != "$CURRENT_TAG" ]; then
+                # Verify it exists in ECR
+                if aws ecr describe-images --repository-name "$SERVICE" --image-ids imageTag="$GIT_TAG" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+                  ROLLBACK_TAG="$GIT_TAG"
+                  SOURCE="Git history"
+                  echo "  ✅ Found in git history: $ROLLBACK_TAG"
+                else
+                  echo "  ⚠️ Git tag $GIT_TAG not in ECR, trying fallback..."
+                fi
+              fi
+              
+              # Method 2: Get available tags from ECR (sorted by push date, newest first)
+              if [ -z "$ROLLBACK_TAG" ]; then
+                echo "  → Trying ECR image list (smart fallback)..."
+                
+                # Get all production tags sorted by date (newest first)
+                # Exclude: 'latest', 'staging-*' prefixed tags
+                ECR_TAGS=$(aws ecr describe-images \
                   --repository-name "$SERVICE" \
-                  --query 'sort_by(imageDetails,&imagePushedAt)[-2].imageTags[0]' \
-                  --output text 2>/dev/null)
-              else
-                ROLLBACK_TAG="$PREVIOUS_TAG"
+                  --query 'sort_by(imageDetails,&imagePushedAt)[*].imageTags[0]' \
+                  --output text 2>/dev/null | tr '\t' '\n' | grep -v "^None$" | grep -v "^latest$" | grep -v "^staging-" | tac)
+                
+                # Find the FIRST tag that:
+                # 1. Is different from current
+                # 2. Actually exists in ECR
+                FOUND_CURRENT=false
+                for TAG in $ECR_TAGS; do
+                  if [ -z "$TAG" ]; then continue; fi
+                  
+                  # Skip if this IS the current tag (we want the one BEFORE it)
+                  if [ "$TAG" == "$CURRENT_TAG" ]; then
+                    FOUND_CURRENT=true
+                    echo "  Skipping current: $TAG"
+                    continue
+                  fi
+                  
+                  # If we found current and this is different, this is our target
+                  if [ "$FOUND_CURRENT" = true ] || [ "$TAG" != "$CURRENT_TAG" ]; then
+                    # Double-verify it exists in ECR
+                    if aws ecr describe-images --repository-name "$SERVICE" --image-ids imageTag="$TAG" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+                      ROLLBACK_TAG="$TAG"
+                      SOURCE="ECR auto-detect"
+                      echo "  ✅ Found in ECR: $ROLLBACK_TAG"
+                      break
+                    else
+                      echo "  Tag $TAG not in ECR, trying next..."
+                    fi
+                  fi
+                done
               fi
             fi
             
-            # Validate rollback tag exists
-            if [ -z "$ROLLBACK_TAG" ] || [ "$ROLLBACK_TAG" == "None" ]; then
-              echo "::error::No rollback tag found for $SERVICE"
-              echo "| $SERVICE | \`$CURRENT_TAG\` | - | ❌ FAIL (no tag) |" >> $GITHUB_STEP_SUMMARY
-              continue
+            # ════════════════════════════════════════════════════════════
+            # Final validation and record result
+            # ════════════════════════════════════════════════════════════
+            if [ -z "$ROLLBACK_TAG" ]; then
+              echo "| $SERVICE | \`$CURRENT_TAG\` | - | - | ❌ No target found |" >> $GITHUB_STEP_SUMMARY
+              ROLLBACK_PLAN="$ROLLBACK_PLAN$SERVICE:SKIP:$CURRENT_TAG:NONE,"
+            elif [ "$ROLLBACK_TAG" == "$CURRENT_TAG" ]; then
+              echo "| $SERVICE | \`$CURRENT_TAG\` | Same | - | ⚠️ Already at target |" >> $GITHUB_STEP_SUMMARY
+              ROLLBACK_PLAN="$ROLLBACK_PLAN$SERVICE:SKIP:$CURRENT_TAG:$ROLLBACK_TAG,"
+            else
+              # Final ECR verification
+              if aws ecr describe-images --repository-name "$SERVICE" --image-ids imageTag="$ROLLBACK_TAG" --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
+                echo "| $SERVICE | \`$CURRENT_TAG\` | \`$ROLLBACK_TAG\` | $SOURCE | ✅ Ready |" >> $GITHUB_STEP_SUMMARY
+                ROLLBACK_PLAN="$ROLLBACK_PLAN$SERVICE:OK:$CURRENT_TAG:$ROLLBACK_TAG,"
+              else
+                echo "| $SERVICE | \`$CURRENT_TAG\` | \`$ROLLBACK_TAG\` | $SOURCE | ❌ Not in ECR |" >> $GITHUB_STEP_SUMMARY
+                ROLLBACK_PLAN="$ROLLBACK_PLAN$SERVICE:FAIL:$CURRENT_TAG:$ROLLBACK_TAG,"
+              fi
             fi
-            
-            # Verify image exists in ECR
-            if ! aws ecr describe-images \
-              --repository-name "$SERVICE" \
-              --image-ids imageTag="$ROLLBACK_TAG" \
-              --region ${{ env.AWS_REGION }} > /dev/null 2>&1; then
-              echo "::error::Rollback image not found: $SERVICE:$ROLLBACK_TAG"
-              echo "| $SERVICE | \`$CURRENT_TAG\` | \`$ROLLBACK_TAG\` | ❌ FAIL (not in ECR) |" >> $GITHUB_STEP_SUMMARY
-              continue
-            fi
-            
-            # Update deployment file
-            sed -i "s|image: ${{ env.ECR_REGISTRY }}/${SERVICE}:.*|image: ${{ env.ECR_REGISTRY }}/${SERVICE}:${ROLLBACK_TAG}|g" "$PROD_FILE"
-            
-            echo "Rolled back: $CURRENT_TAG -> $ROLLBACK_TAG"
-            echo "| $SERVICE | \`$CURRENT_TAG\` | \`$ROLLBACK_TAG\` | ✅ OK |" >> $GITHUB_STEP_SUMMARY
           done
+          
+          echo "rollback_plan=$ROLLBACK_PLAN" >> $GITHUB_OUTPUT
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "### Fallback Logic" >> $GITHUB_STEP_SUMMARY
+          echo "1. **Git history** - Find previous tag from commit history" >> $GITHUB_STEP_SUMMARY
+          echo "2. **ECR auto-detect** - Find next available image before current" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Skip staging** - Ignores \`staging-*\` and \`latest\` tags" >> $GITHUB_STEP_SUMMARY
 
-      - name: Commit and push rollback
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 5: Wait for manual approval (if configured)
+  # ═══════════════════════════════════════════════════════════════════════════
+  step5-approval:
+    name: Approval Gate
+    runs-on: ubuntu-latest
+    needs: [step1-validate, step4-determine-target]
+    environment: production  # Requires approval if protection rules set
+    steps:
+      - name: Approval received
+        run: |
+          echo "## Approval Gate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Approved by:** Environment protection rules passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_If no approval was required, environment protection is not configured._" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 6: Execute the rollback
+  # ═══════════════════════════════════════════════════════════════════════════
+  step6-execute:
+    name: Execute Rollback
+    runs-on: ubuntu-latest
+    needs: [step1-validate, step4-determine-target, step5-approval]
+    outputs:
+      rollback_executed: ${{ steps.execute.outputs.rollback_executed }}
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Execute rollback changes
+        id: execute
+        run: |
+          ROLLBACK_PLAN="${{ needs.step4-determine-target.outputs.rollback_plan }}"
+          
+          echo "## Rollback Execution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Action | From | To | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|------|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          CHANGES_MADE=false
+          
+          # Parse rollback plan: SERVICE:STATUS:CURRENT:TARGET,
+          IFS=',' read -ra ENTRIES <<< "$ROLLBACK_PLAN"
+          for ENTRY in "${ENTRIES[@]}"; do
+            if [ -z "$ENTRY" ]; then continue; fi
+            
+            SERVICE=$(echo "$ENTRY" | cut -d: -f1)
+            STATUS=$(echo "$ENTRY" | cut -d: -f2)
+            CURRENT=$(echo "$ENTRY" | cut -d: -f3)
+            TARGET=$(echo "$ENTRY" | cut -d: -f4)
+            
+            if [ "$STATUS" != "OK" ]; then
+              echo "| $SERVICE | Skip | \`$CURRENT\` | - | $STATUS |" >> $GITHUB_STEP_SUMMARY
+              continue
+            fi
+            
+            PROD_FILE="production/${SERVICE}/deployment.yaml"
+            
+            # Update the deployment file
+            sed -i "s|image: ${{ env.ECR_REGISTRY }}/${SERVICE}:.*|image: ${{ env.ECR_REGISTRY }}/${SERVICE}:${TARGET}|g" "$PROD_FILE"
+            
+            echo "| $SERVICE | Rollback | \`$CURRENT\` | \`$TARGET\` | ✅ Updated |" >> $GITHUB_STEP_SUMMARY
+            CHANGES_MADE=true
+          done
+          
+          echo "rollback_executed=$CHANGES_MADE" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -224,52 +409,91 @@ jobs:
           git add -A
           
           if git diff --staged --quiet; then
-            echo "No changes to commit"
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Result:** No changes needed (already at target version)" >> $GITHUB_STEP_SUMMARY
+            echo "### No Changes" >> $GITHUB_STEP_SUMMARY
+            echo "No deployment files were modified." >> $GITHUB_STEP_SUMMARY
           else
-            SERVICES="${{ needs.validate.outputs.services }}"
+            SERVICES="${{ needs.step1-validate.outputs.services }}"
             git commit -m "[ROLLBACK] $SERVICES - initiated by ${{ github.actor }} - run ${{ github.run_id }}"
             
             git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
             git push
             
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### ⚠️ ROLLBACK EXECUTED" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Changes Committed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Initiated by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Reason:** Manual rollback via workflow" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-            echo "1. ArgoCD will auto-sync within 3 minutes" >> $GITHUB_STEP_SUMMARY
-            echo "2. Monitor: https://argocd.aurora-glam.com" >> $GITHUB_STEP_SUMMARY
-            echo "3. Verify rollback successful at https://aurora-glam.com" >> $GITHUB_STEP_SUMMARY
+            echo "**Commit:** \`[ROLLBACK] $SERVICES - initiated by ${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Create rollback issue for tracking
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STEP 7: Post-rollback actions (notify, create issue)
+  # ═══════════════════════════════════════════════════════════════════════════
+  step7-post-rollback:
+    name: Post-Rollback
+    runs-on: ubuntu-latest
+    needs: [step1-validate, step4-determine-target, step6-execute]
+    if: always()
+    steps:
+      - name: Create tracking issue
+        if: needs.step6-execute.outputs.rollback_executed == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const services = '${{ needs.validate.outputs.services }}'.split(' ').join(', ');
+            const services = '${{ needs.step1-validate.outputs.services }}'.split(' ').join(', ');
+            const rollbackType = '${{ github.event.inputs.rollback_type }}';
+            const specificTag = '${{ github.event.inputs.specific_tag }}' || 'N/A';
+            
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `[ROLLBACK] Production rollback executed - ${new Date().toISOString().split('T')[0]}`,
-              body: `## Rollback Details
-              
-              **Services:** ${services}
-              **Initiated by:** ${{ github.actor }}
-              **Run ID:** ${{ github.run_id }}
-              **Rollback Type:** ${{ github.event.inputs.rollback_type }}
-              
-              ### Action Required
-              - [ ] Investigate root cause of rollback
-              - [ ] Document findings
-              - [ ] Create fix PR
-              - [ ] Re-deploy after fix validated
-              
-              ### Links
-              - [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-              `,
-              labels: ['rollback', 'production', 'urgent']
+              title: `[ROLLBACK] Production rollback - ${services} - ${new Date().toISOString().split('T')[0]}`,
+              body: `## Production Rollback Executed
+            
+            ### Details
+            | Field | Value |
+            |-------|-------|
+            | **Services** | ${services} |
+            | **Initiated by** | @${{ github.actor }} |
+            | **Run ID** | ${{ github.run_id }} |
+            | **Rollback Type** | ${rollbackType} |
+            | **Specific Tag** | ${specificTag} |
+            | **Timestamp** | ${new Date().toISOString()} |
+            
+            ### Required Actions
+            - [ ] Investigate root cause of the issue that triggered rollback
+            - [ ] Document findings in this issue
+            - [ ] Create fix PR with proper testing
+            - [ ] Re-deploy after fix is validated in staging
+            - [ ] Close this issue after re-deployment is successful
+            
+            ### Links
+            - [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [ArgoCD Dashboard](https://argocd.aurora-glam.com)
+            - [Production Site](https://aurora-glam.com)
+            
+            ---
+            _This issue was auto-generated by the rollback workflow._
+            `,
+              labels: ['rollback', 'production', 'urgent', 'incident']
             });
+
+      - name: Final summary
+        run: |
+          echo "##  Rollback Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. **ArgoCD** will auto-sync within 3 minutes" >> $GITHUB_STEP_SUMMARY
+          echo "2. **Monitor** the rollout at [ArgoCD Dashboard](https://argocd.aurora-glam.com)" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Verify** the application at [https://aurora-glam.com](https://aurora-glam.com)" >> $GITHUB_STEP_SUMMARY
+          echo "4. **Investigate** the root cause (see GitHub Issue created)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Verification Commands" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Check pod status" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl get pods -n production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Check deployment image" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl get deployment <service-name> -n production -o jsonpath='{.spec.template.spec.containers[0].image}'" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
