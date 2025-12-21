@@ -31,3 +31,5 @@ spec:
     - "staging.aurora-glam.com"
     - "argocd.aurora-glam.com"
     - "grafana.aurora-glam.com"
+    - "kiali.aurora-glam.com"
+    - "tracing.aurora-glam.com"
