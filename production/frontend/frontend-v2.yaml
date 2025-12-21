@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: frontend-v2
   namespace: production
 spec:
   replicas: 1
@@ -13,16 +13,17 @@ spec:
   selector:
     matchLabels:
       app: frontend
+      version: v2
   template:
     metadata:
       labels:
         app: frontend
-        version: v1
+        version: v2
         istio-prometheus-discovery: "true"
     spec:
       containers:
       - name: frontend
-        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/frontend:6771fafe-20251218055318
+        image: 024955634588.dkr.ecr.us-east-1.amazonaws.com/frontend:staging-915c9def-20251215144558
         ports:
         - containerPort: 3000
         readinessProbe:
@@ -48,6 +49,3 @@ spec:
             memory: "512Mi"
       imagePullSecrets:
         - name: aws-ecr-cred        
-            
-
-      

@@ -332,21 +332,7 @@ resource "aws_autoscaling_group" "app_asg" {
 ```
 **Purpose:** Creates and manages Kubernetes worker nodes.
 
----
 
-#### `runner.tf` - GitHub Actions Runner
-```hcl
-resource "aws_instance" "github_runner" {
-  instance_type = "t3.medium"
-  user_data = templatefile("runner_user_data.sh.tpl", {
-    github_repo   = var.github_repo
-    runner_token  = var.runner_token
-  })
-}
-```
-**Purpose:** Self-hosted runner that can SSH into cluster nodes to run Kubespray.
-
----
 
 #### `user_data.sh` - Node Bootstrap Script
 ```bash

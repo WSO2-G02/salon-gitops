@@ -1,0 +1,22 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: frontend-fault
+  namespace: production
+spec:
+  hosts:
+  - "aurora-glam.com"
+  gateways:
+  - istio-system/salon-gateway
+  http:
+  - fault:
+      delay:
+        percentage:
+          value: 10
+        fixedDelay: 5s
+    route:
+    - destination:
+        host: frontend
+        subset: v1
+        port:
+          number: 80
